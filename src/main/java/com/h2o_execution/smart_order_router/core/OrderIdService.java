@@ -1,7 +1,6 @@
 package com.h2o_execution.smart_order_router.core;
 
-public enum ExecType
+public interface OrderIdService
 {
-    GFD,
-    IOC
+    int generateId();
 }

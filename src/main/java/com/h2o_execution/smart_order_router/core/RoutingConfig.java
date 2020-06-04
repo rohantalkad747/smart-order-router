@@ -17,7 +17,7 @@ import java.util.List;
 public class RoutingConfig
 {
     private Generation generation;
-    private RoutingCountry getCountryRoutingConfig;
+    private RoutingCountry routingCountry;
     private List<Venue> excludedVenues;
     private Venue.Type sweepType;
     private Venue.Type postType;

@@ -30,7 +30,7 @@ public class Order implements Cloneable
     private long updateTime;
     private OrderType orderType;
 
-    public Order createChild(int childQuantity, ExecType execType)
+    public Order createChild(int childQuantity, ExecType execType, int newId)
     {
         return Order
                 .builder()
@@ -38,6 +38,7 @@ public class Order implements Cloneable
                 .currency(currency)
                 .status(Status.NEW)
                 .side(side)
+                .id(newId)
                 .quantity(childQuantity)
                 .cumulativeQuantity(0)
                 .limitPrice(limitPrice)

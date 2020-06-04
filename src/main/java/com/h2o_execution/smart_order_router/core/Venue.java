@@ -20,7 +20,8 @@ public class Venue
     private boolean available;
     private List<String> symbols;
     private Map<String, Rank> symbolRankMap;
-    private double avgLatency;
+    private long avgLatency;
+
     public enum Type
     {LIT, DARK}
 }

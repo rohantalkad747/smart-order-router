@@ -8,5 +8,7 @@ public interface OrderAware
 
     void onCancel(int id);
 
+    void onReject(int id);
+
     void onReplace(int id, Order newOrder);
 }
