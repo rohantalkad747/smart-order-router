@@ -21,9 +21,9 @@ public class ParallelSOR extends SORSupport
     private static final int MAX_PARALLELISM = Runtime.getRuntime().availableProcessors();
     private final List<VenuePropertyPair<Order>> toRoute;
 
-    public ParallelSOR(ProbabilisticExecutionVenueProvider probabilisticExecutionVenueProvider, ConsolidatedOrderBook consolidatedOrderBook)
+    public ParallelSOR(OrderIdService orderIdService, ProbabilisticExecutionVenueProvider probabilisticExecutionVenueProvider, ConsolidatedOrderBook consolidatedOrderBook, RoutingConfig routingConfig)
     {
-        super(orderIdService, probabilisticExecutionVenueProvider, consolidatedOrderBook);
+        super(orderIdService, probabilisticExecutionVenueProvider, consolidatedOrderBook, routingConfig);
         toRoute = new ArrayList<>();
     }
 

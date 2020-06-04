@@ -1,13 +1,16 @@
 package com.h2o_execution.smart_order_router.core;
 
 import com.h2o_execution.smart_order_router.domain.Order;
+import com.h2o_execution.smart_order_router.domain.OrderType;
 import lombok.AllArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 
+import java.util.ArrayList;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.atomic.AtomicInteger;
 
 @Slf4j
 @AllArgsConstructor
@@ -17,25 +20,22 @@ public abstract class SORSupport implements SOR
     private final OrderIdService orderIdService;
     private final ProbabilisticExecutionVenueProvider probabilisticExecutionVenueProvider;
     private final ConsolidatedOrderBook consolidatedOrderBook;
-    private int totalRouted;
+    private final RoutingConfig routingConfig;
+    private final AtomicInteger totalRouted;
     private final Map<Integer, Order> idOrderMap;
 
-    public SORSupport(OrderIdService orderIdService, ProbabilisticExecutionVenueProvider probabilisticExecutionVenueProvider, ConsolidatedOrderBook consolidatedOrderBook)
+    public SORSupport(OrderIdService orderIdService, ProbabilisticExecutionVenueProvider probabilisticExecutionVenueProvider, ConsolidatedOrderBook consolidatedOrderBook, RoutingConfig routingConfig)
     {
         this.orderIdService = orderIdService;
         this.probabilisticExecutionVenueProvider = probabilisticExecutionVenueProvider;
         this.consolidatedOrderBook = consolidatedOrderBook;
-        idOrderMap = new ConcurrentHashMap<>();
-        totalRouted = 0;
+        this.routingConfig = routingConfig;
+        this.idOrderMap = new ConcurrentHashMap<>();
+        this.totalRouted = new AtomicInteger();
     }
 
     public void sendToFixOut(VenuePropertyPair<Order> venuePropertyPair)
     {
-    }
-
-    private synchronized void updateTotalRouted(int adjustment)
-    {
-        totalRouted += adjustment;
     }
 
     protected abstract void onDoneCreatingChildOrders();
@@ -46,23 +46,23 @@ public abstract class SORSupport implements SOR
     {
         Iterator<VenuePropertyPair<Integer>> venueChildOrderIterator = currentVenueTargets.iterator();
         for (VenuePropertyPair<Integer> venueOrderPair = venueChildOrderIterator.next();
-             venueChildOrderIterator.hasNext() && totalRouted <= order.getQuantity();
+             venueChildOrderIterator.hasNext() && totalRouted.get() <= order.getQuantity();
              venueOrderPair = venueChildOrderIterator.next())
         {
             int targetLeaves = venueOrderPair.getVal();
-            int remaining = order.getQuantity() - totalRouted;
+            int remaining = order.getLeaves() - totalRouted.get();
             int childQuantity = Math.min(targetLeaves, remaining);
             int id = orderIdService.generateId();
             Order child = order.createChild(childQuantity, execType, id);
             idOrderMap.put(child.getId(), child);
             Venue venue = venueOrderPair.getVenue();
             onNewChildOrder(new VenuePropertyPair<>(child, venue));
-            totalRouted += childQuantity;
+            totalRouted.addAndGet(childQuantity);
         }
     }
 
     @Override
-    public void route(Order order, RoutingConfig routingConfig)
+    public void route(Order order)
     {
         if (order.isTerminal())
         {
@@ -70,7 +70,7 @@ public abstract class SORSupport implements SOR
         }
         createSweepChildOrders(order, routingConfig);
         onDoneCreatingChildOrders();
-        if (orderStillMarketable(order, totalRouted))
+        if (orderStillMarketable(order))
         {
             createPostChildOrders(order, routingConfig);
             onDoneCreatingChildOrders();
@@ -80,11 +80,12 @@ public abstract class SORSupport implements SOR
     private void createPostChildOrders(Order order, RoutingConfig routingConfig)
     {
         List<VenuePropertyPair<Double>> venueExecutionProbabilityPairs = probabilisticExecutionVenueProvider.getVenueExecutionProbabilityPairs(order.getSymbol(), RoutingStage.POST, routingConfig);
+        currentVenueTargets = new ArrayList<>();
         for (VenuePropertyPair<Double> venueExecutionPair : venueExecutionProbabilityPairs)
         {
             double executionProbability = venueExecutionPair.getVal();
-            int targetLeaves = (int) (order.getQuantity() * executionProbability);
-            currentVenueTargets.add(new VenuePropertyPair<>(targetLeaves, venueExecutionPair.getVenue()));
+            int childQuantity = (int) (order.getLeaves() * executionProbability);
+            currentVenueTargets.add(new VenuePropertyPair<>(childQuantity, venueExecutionPair.getVenue()));
         }
         sliceIntoChildren(order, ExecType.GFD);
     }
@@ -96,29 +97,34 @@ public abstract class SORSupport implements SOR
         sliceIntoChildren(order, ExecType.IOC);
     }
 
-    private boolean orderStillMarketable(Order order, int totalRouted)
+    private boolean orderStillMarketable(Order order)
     {
-        return totalRouted != order.getQuantity();
+        return totalRouted.get() != order.getQuantity();
     }
 
+    @Override
+    public void onReject(int id)
+    {
+        Order order = idOrderMap.get(id);
+        log.warn("Rejection on order", order);
+        totalRouted.addAndGet(-order.getQuantity());
+        route(order);
+    }
 
     @Override
     public void onExecution(int id, int shares)
     {
-
+        Order order = idOrderMap.get(id);
+        order.updateCumulativeQuantity(shares);
+        if (eligibleForRerouting(order))
+        {
+            totalRouted.addAndGet(-order.getLeaves());
+            route(order);
+        }
     }
 
-    @Override
-    public void onCancel(int id)
+    private boolean eligibleForRerouting(Order order)
     {
-        Order order = idOrderMap.get(id);
-        updateTotalRouted(-order.getLeaves());
-    }
-
-    @Override
-    public void onReplace(int id, Order newOrder)
-    {
-        Order order = idOrderMap.get(id);
-        order.get
+        return order.getExecType() == ExecType.IOC && !order.isTerminal();
     }
 }

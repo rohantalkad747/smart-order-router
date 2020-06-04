@@ -7,9 +7,9 @@ import lombok.extern.slf4j.Slf4j;
 public class SerialSOR extends SORSupport
 {
 
-    public SerialSOR(ProbabilisticExecutionVenueProvider probabilisticExecutionVenueProvider, ConsolidatedOrderBook consolidatedOrderBook)
+    public SerialSOR(OrderIdService orderIdService, ProbabilisticExecutionVenueProvider probabilisticExecutionVenueProvider, ConsolidatedOrderBook consolidatedOrderBook, RoutingConfig routingConfig)
     {
-        super(orderIdService, probabilisticExecutionVenueProvider, consolidatedOrderBook);
+        super(orderIdService, probabilisticExecutionVenueProvider, consolidatedOrderBook, routingConfig);
     }
 
     @Override

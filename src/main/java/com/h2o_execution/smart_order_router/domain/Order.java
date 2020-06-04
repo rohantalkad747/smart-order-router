@@ -1,10 +1,7 @@
 package com.h2o_execution.smart_order_router.domain;
 
 import com.h2o_execution.smart_order_router.core.ExecType;
-import lombok.AllArgsConstructor;
-import lombok.Builder;
-import lombok.Data;
-import lombok.NoArgsConstructor;
+import lombok.*;
 
 import java.util.Currency;
 
@@ -24,11 +21,17 @@ public class Order implements Cloneable
     private Status status;
     private Side side;
     private int quantity;
+    @Setter(AccessLevel.NONE)
     private int cumulativeQuantity;
     private int limitPrice;
     private long entryTime;
     private long updateTime;
     private OrderType orderType;
+
+    public synchronized void updateCumulativeQuantity(int newQuantity)
+    {
+        cumulativeQuantity += newQuantity;
+    }
 
     public Order createChild(int childQuantity, ExecType execType, int newId)
     {
