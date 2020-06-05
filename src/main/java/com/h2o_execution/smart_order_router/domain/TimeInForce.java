@@ -1,13 +1,13 @@
 package com.h2o_execution.smart_order_router.domain;
 
-public enum OrderType
+public enum TimeInForce
 {
-    MARKET('1'),
-    LIMIT('2');
+    DAY('0'),
+    IOC('3');
 
     private char data;
 
-    OrderType(char data)
+    TimeInForce(char data)
     {
         this.data = data;
     }

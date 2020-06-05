@@ -1,4 +1,4 @@
-package com.h2o_execution.smart_order_router.core;
+package com.h2o_execution.smart_order_router.domain;
 
 import com.h2o_execution.smart_order_router.domain.Order;
 

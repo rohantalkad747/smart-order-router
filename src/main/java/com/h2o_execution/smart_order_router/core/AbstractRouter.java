@@ -1,7 +1,8 @@
 package com.h2o_execution.smart_order_router.core;
 
+import com.h2o_execution.smart_order_router.domain.TimeInForce;
 import com.h2o_execution.smart_order_router.domain.Order;
-import com.h2o_execution.smart_order_router.domain.OrderType;
+import com.h2o_execution.smart_order_router.domain.Venue;
 import lombok.AllArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 
@@ -14,7 +15,7 @@ import java.util.concurrent.atomic.AtomicInteger;
 
 @Slf4j
 @AllArgsConstructor
-public abstract class SORSupport implements SOR
+public abstract class AbstractRouter implements Router
 {
     protected List<VenuePropertyPair<Integer>> currentVenueTargets;
     private final OrderIdService orderIdService;
@@ -22,9 +23,9 @@ public abstract class SORSupport implements SOR
     private final ConsolidatedOrderBook consolidatedOrderBook;
     private final RoutingConfig routingConfig;
     private final AtomicInteger totalRouted;
-    private final Map<Integer, Order> idOrderMap;
+    private final Map<String, Order> idOrderMap;
 
-    public SORSupport(OrderIdService orderIdService, ProbabilisticExecutionVenueProvider probabilisticExecutionVenueProvider, ConsolidatedOrderBook consolidatedOrderBook, RoutingConfig routingConfig)
+    public AbstractRouter(OrderIdService orderIdService, ProbabilisticExecutionVenueProvider probabilisticExecutionVenueProvider, ConsolidatedOrderBook consolidatedOrderBook, RoutingConfig routingConfig)
     {
         this.orderIdService = orderIdService;
         this.probabilisticExecutionVenueProvider = probabilisticExecutionVenueProvider;
@@ -42,7 +43,7 @@ public abstract class SORSupport implements SOR
 
     protected abstract void onNewChildOrder(VenuePropertyPair<Order> venuePropertyPair);
 
-    public void sliceIntoChildren(Order order, ExecType execType)
+    public void sliceIntoChildren(Order order, TimeInForce timeInForce)
     {
         Iterator<VenuePropertyPair<Integer>> venueChildOrderIterator = currentVenueTargets.iterator();
         for (VenuePropertyPair<Integer> venueOrderPair = venueChildOrderIterator.next();
@@ -52,9 +53,9 @@ public abstract class SORSupport implements SOR
             int targetLeaves = venueOrderPair.getVal();
             int remaining = order.getLeaves() - totalRouted.get();
             int childQuantity = Math.min(targetLeaves, remaining);
-            int id = orderIdService.generateId();
-            Order child = order.createChild(childQuantity, execType, id);
-            idOrderMap.put(child.getId(), child);
+            String id = orderIdService.generateId();
+            Order child = order.createChild(childQuantity, timeInForce, id);
+            idOrderMap.put(child.getClientOrderId(), child);
             Venue venue = venueOrderPair.getVenue();
             onNewChildOrder(new VenuePropertyPair<>(child, venue));
             totalRouted.addAndGet(childQuantity);
@@ -87,14 +88,14 @@ public abstract class SORSupport implements SOR
             int childQuantity = (int) (order.getLeaves() * executionProbability);
             currentVenueTargets.add(new VenuePropertyPair<>(childQuantity, venueExecutionPair.getVenue()));
         }
-        sliceIntoChildren(order, ExecType.GFD);
+        sliceIntoChildren(order, TimeInForce.DAY);
     }
 
     private void createSweepChildOrders(Order order, RoutingConfig routingConfig)
     {
         LiquidityQuery query = new LiquidityQuery(routingConfig.getSweepType(), routingConfig.getRoutingCountry());
         currentVenueTargets = consolidatedOrderBook.getOutstandingSharesPerVenue(query, order);
-        sliceIntoChildren(order, ExecType.IOC);
+        sliceIntoChildren(order, TimeInForce.IOC);
     }
 
     private boolean orderStillMarketable(Order order)
@@ -103,18 +104,18 @@ public abstract class SORSupport implements SOR
     }
 
     @Override
-    public void onReject(int id)
+    public void onReject(String clientOrderId)
     {
-        Order order = idOrderMap.get(id);
+        Order order = idOrderMap.get(clientOrderId);
         log.warn("Rejection on order", order);
         totalRouted.addAndGet(-order.getQuantity());
         route(order);
     }
 
     @Override
-    public void onExecution(int id, int shares)
+    public void onExecution(String clientOrderId, int shares)
     {
-        Order order = idOrderMap.get(id);
+        Order order = idOrderMap.get(clientOrderId);
         order.updateCumulativeQuantity(shares);
         if (eligibleForRerouting(order))
         {
@@ -125,6 +126,6 @@ public abstract class SORSupport implements SOR
 
     private boolean eligibleForRerouting(Order order)
     {
-        return order.getExecType() == ExecType.IOC && !order.isTerminal();
+        return order.getTimeInForce() == TimeInForce.IOC && !order.isTerminal();
     }
 }

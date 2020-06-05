@@ -1,6 +1,7 @@
 package com.h2o_execution.smart_order_router.core;
 
 import com.h2o_execution.smart_order_router.domain.Order;
+import com.h2o_execution.smart_order_router.domain.Venue;
 import lombok.extern.slf4j.Slf4j;
 
 import java.util.ArrayList;
@@ -16,12 +17,12 @@ import java.util.stream.Collectors;
  * to allow orders to reach their venues at roughly the same time.
  */
 @Slf4j
-public class ParallelSOR extends SORSupport
+public class ParallelRouter extends AbstractRouter
 {
     private static final int MAX_PARALLELISM = Runtime.getRuntime().availableProcessors();
     private final List<VenuePropertyPair<Order>> toRoute;
 
-    public ParallelSOR(OrderIdService orderIdService, ProbabilisticExecutionVenueProvider probabilisticExecutionVenueProvider, ConsolidatedOrderBook consolidatedOrderBook, RoutingConfig routingConfig)
+    public ParallelRouter(OrderIdService orderIdService, ProbabilisticExecutionVenueProvider probabilisticExecutionVenueProvider, ConsolidatedOrderBook consolidatedOrderBook, RoutingConfig routingConfig)
     {
         super(orderIdService, probabilisticExecutionVenueProvider, consolidatedOrderBook, routingConfig);
         toRoute = new ArrayList<>();

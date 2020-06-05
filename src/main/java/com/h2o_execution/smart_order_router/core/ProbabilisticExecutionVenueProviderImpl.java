@@ -1,5 +1,6 @@
 package com.h2o_execution.smart_order_router.core;
 
+import com.h2o_execution.smart_order_router.domain.Venue;
 import lombok.extern.slf4j.Slf4j;
 
 import java.util.ArrayList;

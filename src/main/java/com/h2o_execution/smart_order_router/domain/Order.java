@@ -1,9 +1,7 @@
 package com.h2o_execution.smart_order_router.domain;
 
-import com.h2o_execution.smart_order_router.core.ExecType;
 import lombok.*;
-
-import java.util.Currency;
+import quickfix.field.Side;
 
 @Data
 @Builder
@@ -11,21 +9,15 @@ import java.util.Currency;
 @AllArgsConstructor
 public class Order implements Cloneable
 {
-    public enum Side { BUY, SELL }
-    public enum Status { NEW, PARTIAL, FILLED, CANCELLED, REJECTED, EXPIRED }
-
     private String symbol;
-    private int id;
-    private ExecType execType;
+    private String clientOrderId;
+    private TimeInForce timeInForce;
     private Currency currency;
-    private Status status;
     private Side side;
     private int quantity;
     @Setter(AccessLevel.NONE)
     private int cumulativeQuantity;
     private int limitPrice;
-    private long entryTime;
-    private long updateTime;
     private OrderType orderType;
 
     public synchronized void updateCumulativeQuantity(int newQuantity)
@@ -33,21 +25,18 @@ public class Order implements Cloneable
         cumulativeQuantity += newQuantity;
     }
 
-    public Order createChild(int childQuantity, ExecType execType, int newId)
+    public Order createChild(int childQuantity, TimeInForce timeInForce, String newId)
     {
         return Order
                 .builder()
                 .symbol(symbol)
                 .currency(currency)
-                .status(Status.NEW)
+                .clientOrderId(newId)
                 .side(side)
-                .id(newId)
                 .quantity(childQuantity)
                 .cumulativeQuantity(0)
                 .limitPrice(limitPrice)
-                .entryTime(entryTime)
-                .execType(execType)
-                .updateTime(updateTime)
+                .timeInForce(timeInForce)
                 .orderType(orderType)
                 .build();
     }

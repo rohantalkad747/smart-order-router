@@ -26,6 +26,9 @@ dependencies {
 	testAnnotationProcessor 'org.projectlombok:lombok:1.18.12'
 	// https://mvnrepository.com/artifact/org.quickfixj/quickfixj-core
 	compile group: 'org.quickfixj', name: 'quickfixj-core', version: '2.1.1'
+	// https://mvnrepository.com/artifact/org.quickfixj/quickfixj-messages-all
+	compile group: 'org.quickfixj', name: 'quickfixj-messages-all', version: '2.1.1'
+
 
 }
 
