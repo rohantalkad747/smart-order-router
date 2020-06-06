@@ -6,6 +6,7 @@ public interface FXConversionService
      * @return the amount of USD to buy $1 CAD.
      */
     int getUSD(int amtCAD);
+
     /**
      * @return the amount of CAD to buy $1 USD.
      */

@@ -42,7 +42,6 @@ public class Order implements Cloneable
     }
 
 
-
     public int getLeaves()
     {
         return quantity - cumulativeQuantity;

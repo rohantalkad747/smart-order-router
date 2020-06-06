@@ -1,7 +1,7 @@
 package com.h2o_execution.smart_order_router.core;
 
-import com.h2o_execution.smart_order_router.domain.TimeInForce;
 import com.h2o_execution.smart_order_router.domain.Order;
+import com.h2o_execution.smart_order_router.domain.TimeInForce;
 import com.h2o_execution.smart_order_router.domain.Venue;
 import lombok.AllArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -17,13 +17,13 @@ import java.util.concurrent.atomic.AtomicInteger;
 @AllArgsConstructor
 public abstract class AbstractRouter implements Router
 {
-    protected List<VenuePropertyPair<Integer>> currentVenueTargets;
     private final OrderIdService orderIdService;
     private final ProbabilisticExecutionVenueProvider probabilisticExecutionVenueProvider;
     private final ConsolidatedOrderBook consolidatedOrderBook;
     private final RoutingConfig routingConfig;
     private final AtomicInteger totalRouted;
     private final Map<String, Order> idOrderMap;
+    protected List<VenuePropertyPair<Integer>> currentVenueTargets;
 
     public AbstractRouter(OrderIdService orderIdService, ProbabilisticExecutionVenueProvider probabilisticExecutionVenueProvider, ConsolidatedOrderBook consolidatedOrderBook, RoutingConfig routingConfig)
     {
@@ -94,7 +94,7 @@ public abstract class AbstractRouter implements Router
     private void createSweepChildOrders(Order order, RoutingConfig routingConfig)
     {
         LiquidityQuery query = new LiquidityQuery(routingConfig.getSweepType(), routingConfig.getRoutingCountry());
-        currentVenueTargets = consolidatedOrderBook.getOutstandingSharesPerVenue(query, order);
+        currentVenueTargets = consolidatedOrderBook.claimLiquidity(query, order);
         sliceIntoChildren(order, TimeInForce.IOC);
     }
 

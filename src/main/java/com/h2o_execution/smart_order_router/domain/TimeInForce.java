@@ -5,7 +5,7 @@ public enum TimeInForce
     DAY('0'),
     IOC('3');
 
-    private char data;
+    private final char data;
 
     TimeInForce(char data)
     {

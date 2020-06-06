@@ -5,7 +5,7 @@ public enum OrderType
     MARKET('1'),
     LIMIT('2');
 
-    private char data;
+    private final char data;
 
     OrderType(char data)
     {

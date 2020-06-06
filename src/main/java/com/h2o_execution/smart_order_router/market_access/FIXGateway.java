@@ -1,5 +1,6 @@
 package com.h2o_execution.smart_order_router.market_access;
 
+import lombok.Setter;
 import lombok.extern.slf4j.Slf4j;
 import quickfix.*;
 import quickfix.field.ApplVerID;
@@ -11,11 +12,8 @@ import quickfix.fix42.Reject;
 public class FIXGateway extends MessageCracker implements Application
 {
     private static final String CONFIG = "C:/Users/Rohan/git/smart_order_router/src/main/resources/gatewayserver.properties";
+    @Setter
     private FIXMessageMediator fixMessageMediator;
-
-    public FIXGateway()
-    {
-    }
 
     public static void main(String[] args) throws Exception
     {
@@ -29,17 +27,22 @@ public class FIXGateway extends MessageCracker implements Application
         socketAcceptor.start();
     }
 
-    private ApplVerID getApplVerID(Session session, Message message)
+    @Override
+    public void fromApp(Message message, SessionID sessionId) throws FieldNotFound, IncorrectDataFormat, IncorrectTagValue, UnsupportedMessageType
     {
-        String beginString = session.getSessionID().getBeginString();
-        if (FixVersions.BEGINSTRING_FIXT11.equals(beginString))
-        {
-            return new ApplVerID(ApplVerID.FIX50);
-        }
-        else
-        {
-            return MessageUtils.toApplVerID(beginString);
-        }
+        crack(message, sessionId);
+    }
+
+    @Override
+    public void onMessage(Reject message, SessionID sessionID) throws FieldNotFound, UnsupportedMessageType, IncorrectTagValue
+    {
+        fixMessageMediator.fireRejectionEvent(message);
+    }
+
+    @Override
+    public void onMessage(ExecutionReport message, SessionID sessionID) throws FieldNotFound, UnsupportedMessageType, IncorrectTagValue
+    {
+        fixMessageMediator.fireReceiveExecutionReport(message);
     }
 
     public void sendMessage(SessionID sessionID, Message message)
@@ -64,25 +67,17 @@ public class FIXGateway extends MessageCracker implements Application
         }
     }
 
-    @Override
-    public void fromApp(Message message, SessionID sessionId) throws FieldNotFound, IncorrectDataFormat, IncorrectTagValue, UnsupportedMessageType
+    private ApplVerID getApplVerID(Session session, Message message)
     {
-        crack(message, sessionId);
-    }
-
-    @Override
-    public void onMessage(Reject message, SessionID sessionID) throws FieldNotFound, UnsupportedMessageType, IncorrectTagValue
-    {
-        fixMessageMediator.fireRejectionEvent(message);
-    }
-
-    /**
-     * Routes executions to active SORs.
-     */
-    @Override
-    public void onMessage(ExecutionReport message, SessionID sessionID) throws FieldNotFound, UnsupportedMessageType, IncorrectTagValue
-    {
-        fixMessageMediator.fireReceiveExecutionReport(message);
+        String beginString = session.getSessionID().getBeginString();
+        if (FixVersions.BEGINSTRING_FIXT11.equals(beginString))
+        {
+            return new ApplVerID(ApplVerID.FIX50);
+        }
+        else
+        {
+            return MessageUtils.toApplVerID(beginString);
+        }
     }
 
     @Override
@@ -94,22 +89,25 @@ public class FIXGateway extends MessageCracker implements Application
     @Override
     public void onLogon(SessionID sessionId)
     {
-
+        fixMessageMediator.fireConnectEvent(sessionId);
     }
 
     @Override
     public void onLogout(SessionID sessionId)
     {
+        fixMessageMediator.fireDisconnectEvent(sessionId);
     }
 
     @Override
     public void toAdmin(Message message, SessionID sessionId)
     {
+        log.info("Sent message to admin", message.toString());
     }
 
     @Override
     public void fromAdmin(Message message, SessionID sessionId) throws FieldNotFound, IncorrectDataFormat, IncorrectTagValue, RejectLogon
     {
+        log.info("Received message from admin", message.toString());
     }
 
     @Override
