@@ -67,6 +67,7 @@ public class ParallelRouter extends AbstractRouter
         finally
         {
             executorService.shutdown();
+            log.info("Thread pool shutdown for SOR");
         }
     }
 
@@ -83,7 +84,7 @@ public class ParallelRouter extends AbstractRouter
             catch (InterruptedException e)
             {
                 Thread.currentThread().interrupt();
-                log.error("Thread interrupted while performing latency adjustment", e);
+                log.error("Thread interrupted in order send task", e);
             }
             return null;
         };
@@ -91,11 +92,25 @@ public class ParallelRouter extends AbstractRouter
 
     private List<Long> getLatencyAdjustments()
     {
-        List<Venue> venues = currentVenueTargets
-                .stream()
-                .map(VenuePropertyPair::getVenue)
-                .collect(Collectors.toList());
+        List<Venue> venues = getTargetVanues();
+        long max = getMaxLatency(venues);
+        return calculateAdjustments(venues, max);
+    }
+
+    private List<Long> calculateAdjustments(List<Venue> venues, long max)
+    {
         List<Long> adjustments = new ArrayList<>();
+        for (Venue venue : venues)
+        {
+            long thisVenueLatency = venue.getAvgLatency();
+            long adjustment = max - thisVenueLatency;
+            adjustments.add(adjustment);
+        }
+        return adjustments;
+    }
+
+    private long getMaxLatency(List<Venue> venues)
+    {
         long max = 0;
         for (Venue venue : venues)
         {
@@ -105,12 +120,14 @@ public class ParallelRouter extends AbstractRouter
                 max = latency;
             }
         }
-        for (Venue venue : venues)
-        {
-            long thisVenueLatency = venue.getAvgLatency();
-            long adjustment = max - thisVenueLatency;
-            adjustments.add(adjustment);
-        }
-        return adjustments;
+        return max;
+    }
+
+    private List<Venue> getTargetVanues()
+    {
+        return currentVenueTargets
+                .stream()
+                .map(VenuePropertyPair::getVenue)
+                .collect(Collectors.toList());
     }
 }

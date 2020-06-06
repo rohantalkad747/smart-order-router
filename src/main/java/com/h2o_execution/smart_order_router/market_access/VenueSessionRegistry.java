@@ -6,15 +6,17 @@ import quickfix.SessionID;
 import java.util.List;
 
 /**
- * Managed service for venue connectivity and FIX session creation/retrieval.
+ * Managed service for venue connectivity.\
+ *
+ * @author Rohan
  */
 public interface VenueSessionRegistry
 {
     SessionID getSession(Venue venue);
 
-    void onConnection(Venue venue);
+    void onConnect(SessionID sessionID);
 
-    void connect(List<Venue> venueList);
+    void createSessions(List<Venue> venues);
 
-    void onDisconnect(Venue venue);
+    void onDisconnect(SessionID sessionID);
 }

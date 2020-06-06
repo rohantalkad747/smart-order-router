@@ -8,10 +8,10 @@ import quickfix.fix42.MessageCracker;
 import quickfix.fix42.Reject;
 
 @Slf4j
-public class FIXGateway extends MessageCracker implements quickfix.Application
+public class FIXGateway extends MessageCracker implements Application
 {
     private static final String CONFIG = "C:/Users/Rohan/git/smart_order_router/src/main/resources/gatewayserver.properties";
-    private OrderActionsMediator orderActionsMediator;
+    private FIXMessageMediator fixMessageMediator;
 
     public FIXGateway()
     {
@@ -73,25 +73,22 @@ public class FIXGateway extends MessageCracker implements quickfix.Application
     @Override
     public void onMessage(Reject message, SessionID sessionID) throws FieldNotFound, UnsupportedMessageType, IncorrectTagValue
     {
-        orderActionsMediator.fireRejectionEvent(message);
+        fixMessageMediator.fireRejectionEvent(message);
     }
 
     /**
      * Routes executions to active SORs.
-     *
-     * @param message
-     * @param sessionID
      */
     @Override
     public void onMessage(ExecutionReport message, SessionID sessionID) throws FieldNotFound, UnsupportedMessageType, IncorrectTagValue
     {
-        super.onMessage(message, sessionID);
+        fixMessageMediator.fireReceiveExecutionReport(message);
     }
 
     @Override
     public void onCreate(SessionID sessionId)
     {
-
+        log.info("New session created", sessionId);
     }
 
     @Override
@@ -118,5 +115,6 @@ public class FIXGateway extends MessageCracker implements quickfix.Application
     @Override
     public void toApp(Message message, SessionID sessionId) throws DoNotSend
     {
+        throw new DoNotSend();
     }
 }

@@ -1,6 +1,5 @@
 package com.h2o_execution.smart_order_router.market_access;
 
-
 import com.h2o_execution.smart_order_router.core.Router;
 import com.h2o_execution.smart_order_router.domain.Order;
 import com.h2o_execution.smart_order_router.domain.OrderType;
@@ -9,17 +8,15 @@ import quickfix.field.*;
 import quickfix.fix42.NewOrderSingle;
 
 import java.time.LocalDateTime;
-import java.util.Map;
 
-public class RouterOrderManagementService
+public interface IOrderManager
 {
-    private FIXGateway delegate;
-    private Map<String, Router> activeRouters;
-    private OrderActionsMediator orderActionsMediator;
+    void sendOrder(Venue v, Order order, Router router);
 
-    public void sendOrder(Venue v, Order order, Router router)
+    default NewOrderSingle buildNewOrderSingle(Order order)
     {
-        NewOrderSingle newOrderSingle = new NewOrderSingle(
+        NewOrderSingle newOrderSingle = new NewOrderSingle
+        (
                 new ClOrdID(order.getClientOrderId()),
                 new HandlInst(HandlInst.AUTOMATED_EXECUTION_ORDER_PRIVATE_NO_BROKER_INTERVENTION),
                 new Symbol(order.getSymbol()),
@@ -33,10 +30,6 @@ public class RouterOrderManagementService
         {
             newOrderSingle.set(new Price(order.getLimitPrice()));
         }
-        orderActionsMediator.fireNewSingleOrderEvent(v, newOrderSingle);
-        activeRouters.put(order.getClientOrderId(), router);
+        return newOrderSingle;
     }
-
-
-
 }
