@@ -164,5 +164,6 @@ public class ConsolidatedOrderBookImpl implements ConsolidatedOrderBook
     @Override
     public void onReject(String clientOrderId)
     {
+        // Don't care about rejections since we never send orders from here
     }
 }
