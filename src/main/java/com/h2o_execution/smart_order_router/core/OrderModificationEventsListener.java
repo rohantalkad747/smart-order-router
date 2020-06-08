@@ -4,7 +4,7 @@ import com.h2o_execution.smart_order_router.domain.Order;
 
 public interface OrderModificationEventsListener extends OrderEventsListener
 {
-    void onCancel(int id);
+    void onCancel(String id);
 
-    void onReplace(int id, Order newOrder);
+    void onReplace(String id, Order newOrder);
 }

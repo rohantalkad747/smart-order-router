@@ -92,8 +92,8 @@ public class ProbabilisticExecutionVenueProviderImpl implements ProbabilisticExe
         {
             venueStream = venueStream.filter(x -> x.getType() == routingConfig.getSweepType());
         }
-        RoutingCountry country = routingConfig.getRoutingCountry();
-        if (country != RoutingCountry.CROSS_BORDER)
+        Country country = routingConfig.getRoutingCountry();
+        if (country != Country.CROSS_BORDER)
         {
             venueStream = venueStream.filter(x -> x.getCountry().equals(country.toString()));
         }

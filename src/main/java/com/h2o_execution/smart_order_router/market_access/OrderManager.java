@@ -10,12 +10,19 @@ import quickfix.field.*;
 import quickfix.fix42.NewOrderSingle;
 
 import java.time.LocalDateTime;
+import java.util.HashMap;
 import java.util.Map;
 
 public class OrderManager implements IOrderManager, OrderEventsListener
 {
     private Map<String, Router> activeRouters;
     private FIXMessageMediator fixMessageMediator;
+
+    public OrderManager(FIXMessageMediator fixMessageMediator)
+    {
+        this.fixMessageMediator = fixMessageMediator;
+        this.activeRouters = new HashMap<>();
+    }
 
     private NewOrderSingle buildNewOrderSingle(Order order)
     {

@@ -2,6 +2,7 @@ package com.h2o_execution.smart_order_router.core;
 
 import com.h2o_execution.smart_order_router.domain.Order;
 import com.h2o_execution.smart_order_router.domain.Venue;
+import com.h2o_execution.smart_order_router.market_access.OrderManager;
 import lombok.extern.slf4j.Slf4j;
 
 import java.util.ArrayList;
@@ -22,9 +23,9 @@ public class ParallelRouter extends AbstractRouter
     private static final int MAX_PARALLELISM = Runtime.getRuntime().availableProcessors();
     private final List<VenuePropertyPair<Order>> toRoute;
 
-    public ParallelRouter(OrderIdService orderIdService, ProbabilisticExecutionVenueProvider probabilisticExecutionVenueProvider, ConsolidatedOrderBook consolidatedOrderBook, RoutingConfig routingConfig)
+    public ParallelRouter(OrderManager orderManager, OrderIdService orderIdService, ProbabilisticExecutionVenueProvider probabilisticExecutionVenueProvider, ConsolidatedOrderBook consolidatedOrderBook, RoutingConfig routingConfig)
     {
-        super(orderIdService, probabilisticExecutionVenueProvider, consolidatedOrderBook, routingConfig);
+        super(orderIdService, orderManager, probabilisticExecutionVenueProvider, consolidatedOrderBook, routingConfig);
         toRoute = new ArrayList<>();
     }
 
@@ -78,7 +79,7 @@ public class ParallelRouter extends AbstractRouter
             try
             {
                 Thread.sleep(latencyAdjustment);
-                sendToFixOut(vpp);
+                orderManager.sendOrder(vpp.getVenue(), vpp.getVal(), this);
                 countDownLatch.countDown();
             }
             catch (InterruptedException e)
@@ -125,7 +126,7 @@ public class ParallelRouter extends AbstractRouter
 
     private List<Venue> getTargetVanues()
     {
-        return currentVenueTargets
+        return targets
                 .stream()
                 .map(VenuePropertyPair::getVenue)
                 .collect(Collectors.toList());

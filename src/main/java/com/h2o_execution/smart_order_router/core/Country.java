@@ -1,6 +1,6 @@
 package com.h2o_execution.smart_order_router.core;
 
-public enum RoutingCountry
+public enum Country
 {
     CAN,
     USA,

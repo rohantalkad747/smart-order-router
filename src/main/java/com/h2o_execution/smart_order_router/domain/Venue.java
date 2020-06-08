@@ -1,5 +1,6 @@
 package com.h2o_execution.smart_order_router.domain;
 
+import com.h2o_execution.smart_order_router.core.Country;
 import com.h2o_execution.smart_order_router.core.Rank;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
@@ -16,7 +17,7 @@ import java.util.Map;
 public class Venue
 {
     private Name name;
-    private String country;
+    private Country country;
     private Type type;
     private boolean available;
     private List<String> symbols;
