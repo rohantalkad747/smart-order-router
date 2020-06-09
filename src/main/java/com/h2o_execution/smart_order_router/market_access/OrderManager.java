@@ -15,8 +15,8 @@ import java.util.Map;
 
 public class OrderManager implements IOrderManager, OrderEventsListener
 {
-    private Map<String, Router> activeRouters;
-    private FIXMessageMediator fixMessageMediator;
+    private final Map<String, Router> activeRouters;
+    private final FIXMessageMediator fixMessageMediator;
 
     public OrderManager(FIXMessageMediator fixMessageMediator)
     {

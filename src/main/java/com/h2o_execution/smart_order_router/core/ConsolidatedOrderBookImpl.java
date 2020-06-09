@@ -17,48 +17,9 @@ public class ConsolidatedOrderBookImpl implements ConsolidatedOrderBook
 {
     private static final int BUY = 0;
     private static final int SELL = 1;
-    private Map<String, Map<Currency, Map<Double, Map<Venue, VolumeClaimPair>>[]>> orderBookMap;
-    private Map<String, Order> orderMap;
+    private final Map<String, Map<Currency, Map<Double, Map<Venue, VolumeClaimPair>>[]>> orderBookMap;
+    private final Map<String, Order> orderMap;
     private FXRatesService fxRatesService;
-
-    @Data
-    @Builder
-    @AllArgsConstructor
-    public static class LiquidityQuery
-    {
-        private Venue.Type type;
-        private String symbol;
-        private int quantity;
-        private double limitPx;
-        private Side side;
-        private Currency baseCurrency;
-        private Set<Currency> currencies;
-        private Set<Country> countries;
-    }
-
-    @Data
-    private static class VolumeClaimPair
-    {
-        private volatile int totalVolume;
-        private volatile int claimed;
-
-        /**
-         * Attempts the claim the given {@code amount}.
-         * @return the number of shares actually claimed.
-         */
-        public synchronized int claim(int amount)
-        {
-            int amtLeft = totalVolume - claimed;
-            int actuallyClaimed = Math.min(amtLeft, amount);
-            claimed -= actuallyClaimed;
-            return actuallyClaimed;
-        }
-
-        public synchronized void incVol(int amount)
-        {
-            totalVolume += amount;
-        }
-    }
 
     public ConsolidatedOrderBookImpl()
     {
@@ -94,8 +55,8 @@ public class ConsolidatedOrderBookImpl implements ConsolidatedOrderBook
                     VolumeClaimPair vcp = volumeVenueClaimPair.getValue();
                     final int finalCurrentClaimed = vcp.claim(leftToClaim);
                     currentClaimed += finalCurrentClaimed;
-                    allotted.merge(volumeVenueClaimPair.getKey(), 0, (k, v) ->  finalCurrentClaimed + v);
-                    if ( currentClaimed == orderQuantity )
+                    allotted.merge(volumeVenueClaimPair.getKey(), 0, (k, v) -> finalCurrentClaimed + v);
+                    if (currentClaimed == orderQuantity)
                     {
                         return allotted;
                     }
@@ -118,9 +79,9 @@ public class ConsolidatedOrderBookImpl implements ConsolidatedOrderBook
                     double fxRate = fxRatesService.getFXRate(q.getBaseCurrency(), x.getKey());
                     return
                             ppToVenues
-                            .entrySet()
-                            .stream()
-                            .map(venueVolumeClaimPairMap -> new AbstractMap.SimpleEntry<Double, Map<Venue, VolumeClaimPair>>(venueVolumeClaimPairMap.getKey() * fxRate, venueVolumeClaimPairMap.getValue()));
+                                    .entrySet()
+                                    .stream()
+                                    .map(venueVolumeClaimPairMap -> new AbstractMap.SimpleEntry<Double, Map<Venue, VolumeClaimPair>>(venueVolumeClaimPairMap.getKey() * fxRate, venueVolumeClaimPairMap.getValue()));
                 })
                 .filter(x -> x.getKey() < q.getLimitPx())
                 .collect(Collectors.toList());
@@ -178,5 +139,45 @@ public class ConsolidatedOrderBookImpl implements ConsolidatedOrderBook
     public void onReject(String clientOrderId)
     {
         // Don't care about rejections since we never send orders from here
+    }
+
+    @Data
+    @Builder
+    @AllArgsConstructor
+    public static class LiquidityQuery
+    {
+        private Venue.Type type;
+        private String symbol;
+        private int quantity;
+        private double limitPx;
+        private Side side;
+        private Currency baseCurrency;
+        private Set<Currency> currencies;
+        private Set<Country> countries;
+    }
+
+    @Data
+    private static class VolumeClaimPair
+    {
+        private volatile int totalVolume;
+        private volatile int claimed;
+
+        /**
+         * Attempts the claim the given {@code amount}.
+         *
+         * @return the number of shares actually claimed.
+         */
+        public synchronized int claim(int amount)
+        {
+            int amtLeft = totalVolume - claimed;
+            int actuallyClaimed = Math.min(amtLeft, amount);
+            claimed -= actuallyClaimed;
+            return actuallyClaimed;
+        }
+
+        public synchronized void incVol(int amount)
+        {
+            totalVolume += amount;
+        }
     }
 }

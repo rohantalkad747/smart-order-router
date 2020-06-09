@@ -1,10 +1,8 @@
 package com.h2o_execution.smart_order_router.core;
 
 import com.h2o_execution.smart_order_router.domain.Order;
-import com.h2o_execution.smart_order_router.domain.Side;
 import com.h2o_execution.smart_order_router.domain.Venue;
 
-import java.util.List;
 import java.util.Map;
 
 public interface ConsolidatedOrderBook extends OrderModificationEventsListener

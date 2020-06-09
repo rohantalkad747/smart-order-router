@@ -1,6 +1,5 @@
 package com.h2o_execution.smart_order_router.core;
 
-import com.h2o_execution.smart_order_router.domain.Currency;
 import com.h2o_execution.smart_order_router.domain.Order;
 import com.h2o_execution.smart_order_router.domain.TimeInForce;
 import com.h2o_execution.smart_order_router.domain.Venue;
@@ -8,7 +7,9 @@ import com.h2o_execution.smart_order_router.market_access.OrderManager;
 import lombok.AllArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 
-import java.util.*;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
 import java.util.Map.Entry;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicInteger;
@@ -17,13 +18,13 @@ import java.util.concurrent.atomic.AtomicInteger;
 @AllArgsConstructor
 public abstract class AbstractRouter implements Router
 {
+    protected final OrderManager orderManager;
     private final OrderIdService orderIdService;
     private final ProbabilisticExecutionVenueProvider probabilisticExecutionVenueProvider;
     private final ConsolidatedOrderBook consolidatedOrderBook;
     private final RoutingConfig routingConfig;
     private final AtomicInteger totalRouted;
     private final Map<String, Order> idOrderMap;
-    protected final OrderManager orderManager;
     protected Map<Venue, Integer> routes;
 
     public AbstractRouter(OrderIdService orderIdService, OrderManager orderManager, ProbabilisticExecutionVenueProvider probabilisticExecutionVenueProvider, ConsolidatedOrderBook consolidatedOrderBook, RoutingConfig routingConfig)

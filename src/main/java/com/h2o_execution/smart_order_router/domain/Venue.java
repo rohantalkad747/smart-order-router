@@ -7,10 +7,11 @@ import lombok.Builder;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 
-import java.time.*;
+import java.time.LocalDateTime;
+import java.time.ZoneId;
+import java.time.ZonedDateTime;
 import java.util.List;
 import java.util.Map;
-import java.util.TimeZone;
 
 @Data
 @Builder
@@ -18,14 +19,6 @@ import java.util.TimeZone;
 @AllArgsConstructor
 public class Venue
 {
-
-    @AllArgsConstructor
-    @Data
-    public static class Bell
-    {
-        private int hours;
-        private int minutes;
-    }
 
     private Name name;
     private ZoneId timeZone;
@@ -64,4 +57,12 @@ public class Venue
 
     public enum Type
     {LIT, DARK}
+
+    @AllArgsConstructor
+    @Data
+    public static class Bell
+    {
+        private int hours;
+        private int minutes;
+    }
 }

@@ -10,9 +10,9 @@ import java.util.stream.Stream;
 @Slf4j
 public class ProbabilisticExecutionVenueProviderImpl implements ProbabilisticExecutionVenueProvider
 {
+    private static final List<Country> CROSS_BORDER = Arrays.asList(Country.CAN, Country.USA, Country.UK);
     private final List<Venue> venues;
     private Map<String, List<Venue>> symbolVenueMap;
-    private static final List<Country> CROSS_BORDER = Arrays.asList(Country.CAN, Country.USA, Country.UK);
 
     public ProbabilisticExecutionVenueProviderImpl(List<Venue> venues)
     {

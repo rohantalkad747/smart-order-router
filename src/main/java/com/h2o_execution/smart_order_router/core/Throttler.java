@@ -4,10 +4,10 @@ import java.util.concurrent.TimeUnit;
 
 public class Throttler
 {
-    private volatile int ordersThisSecond;
-    private volatile boolean sleeping;
     private final int threshold;
     private final TimeUnit unit;
+    private volatile int ordersThisSecond;
+    private volatile boolean sleeping;
 
     public Throttler(int threshold, TimeUnit unit)
     {
@@ -23,10 +23,11 @@ public class Throttler
     public synchronized void onOrder()
     {
         ordersThisSecond++;
-        if ( !sleeping )
+        if (!sleeping)
         {
             sleeping = true;
-            new Thread(() -> {
+            new Thread(() ->
+            {
                 try
                 {
                     unit.sleep(1);
