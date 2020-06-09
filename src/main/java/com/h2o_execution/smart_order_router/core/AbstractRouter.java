@@ -128,7 +128,7 @@ public abstract class AbstractRouter implements Router
     {
         Order order = idOrderMap.get(clientOrderId);
         log.warn("Rejection on order", order);
-        totalRouted.addAndGet(-order.getQuantity());
+        totalRouted.addAndGet(-(order.getQuantity()));
         route(order);
     }
 
@@ -139,7 +139,7 @@ public abstract class AbstractRouter implements Router
         order.updateCumulativeQuantity(shares);
         if (eligibleForRerouting(order))
         {
-            totalRouted.addAndGet(-order.getLeaves());
+            totalRouted.addAndGet(-(order.getLeaves()));
             route(order);
         }
     }

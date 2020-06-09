@@ -68,6 +68,7 @@ public class ConsolidatedOrderBookImpl implements ConsolidatedOrderBook
 
     private List<Entry<Double, Map<Venue, VolumeClaimPair>>> getCompatiblePricePoints(LiquidityQuery q)
     {
+        Map<Currency, Double> againstBase = new HashMap<>();
         return orderBookMap
                 .get(q.getSymbol())
                 .entrySet()
@@ -76,14 +77,14 @@ public class ConsolidatedOrderBookImpl implements ConsolidatedOrderBook
                 .flatMap(x ->
                 {
                     Map<Double, Map<Venue, VolumeClaimPair>> ppToVenues = x.getValue()[sideIndex(q.getSide())];
-                    double fxRate = fxRatesService.getFXRate(q.getBaseCurrency(), x.getKey());
+                    double fxRate = againstBase.computeIfAbsent(x.getKey(), k -> fxRatesService.getFXRate(q.getBaseCurrency(), x.getKey()));
                     return
                             ppToVenues
                                     .entrySet()
                                     .stream()
                                     .map(venueVolumeClaimPairMap -> new AbstractMap.SimpleEntry<Double, Map<Venue, VolumeClaimPair>>(venueVolumeClaimPairMap.getKey() * fxRate, venueVolumeClaimPairMap.getValue()));
                 })
-                .filter(x -> x.getKey() < q.getLimitPx())
+                .filter(x -> q.side == Side.BUY ? x.getKey() <= q.getLimitPx() : x.getKey() >= q.getLimitPx())
                 .collect(Collectors.toList());
     }
 
