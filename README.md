@@ -6,7 +6,6 @@
 - Probabilistic Model for Venue Posting (Lit & Dark)
 - FIX 4.2 Gateway for sending single orders and receiving rejects and executions
 - FX Service for calculating best execution across NA venues
-- Market Data Streaming
 - Order Generation Throttling
 
 

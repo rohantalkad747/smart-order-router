@@ -6,7 +6,7 @@ import quickfix.SessionID;
 import java.util.List;
 
 /**
- * Managed service for venue connectivity.\
+ * Managed service for venue connectivity
  *
  * @author Rohan
  */

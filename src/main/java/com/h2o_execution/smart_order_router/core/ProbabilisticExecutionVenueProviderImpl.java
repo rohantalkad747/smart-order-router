@@ -3,9 +3,7 @@ package com.h2o_execution.smart_order_router.core;
 import com.h2o_execution.smart_order_router.domain.Venue;
 import lombok.extern.slf4j.Slf4j;
 
-import java.util.ArrayList;
-import java.util.List;
-import java.util.Map;
+import java.util.*;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
@@ -14,6 +12,7 @@ public class ProbabilisticExecutionVenueProviderImpl implements ProbabilisticExe
 {
     private final List<Venue> venues;
     private Map<String, List<Venue>> symbolVenueMap;
+    private static final List<Country> CROSS_BORDER = Arrays.asList(Country.CAN, Country.USA, Country.UK);
 
     public ProbabilisticExecutionVenueProviderImpl(List<Venue> venues)
     {
@@ -92,10 +91,10 @@ public class ProbabilisticExecutionVenueProviderImpl implements ProbabilisticExe
         {
             venueStream = venueStream.filter(x -> x.getType() == routingConfig.getSweepType());
         }
-        Country country = routingConfig.getRoutingCountry();
-        if (country != Country.CROSS_BORDER)
+        Set<Country> countrySet = routingConfig.getCountrySet();
+        if (!routingConfig.getCountrySet().containsAll(CROSS_BORDER))
         {
-            venueStream = venueStream.filter(x -> x.getCountry().equals(country.toString()));
+            venueStream = venueStream.filter(x -> countrySet.contains(x.getCountry()));
         }
         return venueStream
                 .filter(Venue::isAvailable)

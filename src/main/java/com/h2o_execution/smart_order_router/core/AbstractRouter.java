@@ -17,14 +17,14 @@ import java.util.concurrent.atomic.AtomicInteger;
 @AllArgsConstructor
 public abstract class AbstractRouter implements Router
 {
-    protected final OrderManager orderManager;
     private final OrderIdService orderIdService;
     private final ProbabilisticExecutionVenueProvider probabilisticExecutionVenueProvider;
     private final ConsolidatedOrderBook consolidatedOrderBook;
     private final RoutingConfig routingConfig;
     private final AtomicInteger totalRouted;
     private final Map<String, Order> idOrderMap;
-    private Map<Venue, Integer> targets;
+    protected final OrderManager orderManager;
+    protected Map<Venue, Integer> routes;
 
     public AbstractRouter(OrderIdService orderIdService, OrderManager orderManager, ProbabilisticExecutionVenueProvider probabilisticExecutionVenueProvider, ConsolidatedOrderBook consolidatedOrderBook, RoutingConfig routingConfig)
     {
@@ -35,28 +35,16 @@ public abstract class AbstractRouter implements Router
         this.routingConfig = routingConfig;
         this.idOrderMap = new ConcurrentHashMap<>();
         this.totalRouted = new AtomicInteger();
-        this.targets = new HashMap<>();
+        this.routes = new HashMap<>();
     }
 
     protected abstract void onDoneCreatingChildOrders();
 
-    protected abstract void onNewChildOrder(Order order);
-
-    private Currency getCurrency(Venue venue)
-    {
-        if (venue.getCountry() == Country.CAN)
-        {
-            return Currency.CAD;
-        }
-        return Currency.USD;
-    }
+    protected abstract void onNewChildOrder(VenuePropertyPair<Order> order);
 
     public void sliceIntoChildren(Order order, TimeInForce timeInForce)
     {
-        Iterator<Entry<Venue, Integer>> venueChildOrderIterator = targets.entrySet().iterator();
-        for (Entry<Venue, Integer> target = venueChildOrderIterator.next();
-             venueChildOrderIterator.hasNext() && totalRouted.get() <= order.getQuantity();
-             target = venueChildOrderIterator.next())
+        for (Entry<Venue, Integer> target : routes.entrySet())
         {
             int targetLeaves = target.getValue();
             int remaining = order.getLeaves() - totalRouted.get();
@@ -64,7 +52,7 @@ public abstract class AbstractRouter implements Router
             String id = orderIdService.generateId();
             Order child = createChild(order, target.getKey(), childQuantity, timeInForce, id);
             idOrderMap.put(child.getClientOrderId(), child);
-            onNewChildOrder(child);
+            onNewChildOrder(new VenuePropertyPair<>(child, target.getKey()));
             totalRouted.addAndGet(childQuantity);
         }
     }
@@ -74,7 +62,7 @@ public abstract class AbstractRouter implements Router
         return Order
                 .builder()
                 .symbol(prnt.getSymbol())
-                .currency(getCurrency(venue))
+                .currency(venue.getCurrency())
                 .venue(venue)
                 .clientOrderId(newId)
                 .side(prnt.getSide())
@@ -105,12 +93,12 @@ public abstract class AbstractRouter implements Router
     private void createPostChildOrders(Order order, RoutingConfig routingConfig)
     {
         List<VenuePropertyPair<Double>> venueExecutionProbabilityPairs = probabilisticExecutionVenueProvider.getVenueExecutionProbabilityPairs(order.getSymbol(), RoutingStage.POST, routingConfig);
-        targets = new HashMap<>();
+        routes = new HashMap<>();
         for (VenuePropertyPair<Double> venueExecutionPair : venueExecutionProbabilityPairs)
         {
             double executionProbability = venueExecutionPair.getVal();
             int childQuantity = (int) (order.getLeaves() * executionProbability);
-            targets.put(venueExecutionPair.getVenue(), childQuantity);
+            routes.put(venueExecutionPair.getVenue(), childQuantity);
         }
         sliceIntoChildren(order, TimeInForce.DAY);
     }
@@ -119,13 +107,13 @@ public abstract class AbstractRouter implements Router
     {
         ConsolidatedOrderBookImpl.LiquidityQuery query = ConsolidatedOrderBookImpl.LiquidityQuery.builder()
                 .type(routingConfig.getSweepType())
-                .country(routingConfig.getRoutingCountry())
+                .countries(routingConfig.getCountrySet())
                 .limitPx(order.getLimitPrice())
                 .symbol(order.getSymbol())
                 .quantity(order.getLeaves())
                 .side(order.getSide())
                 .build();
-        targets = consolidatedOrderBook.claimLiquidity(query);
+        routes = consolidatedOrderBook.claimLiquidity(query);
         sliceIntoChildren(order, TimeInForce.IOC);
     }
 

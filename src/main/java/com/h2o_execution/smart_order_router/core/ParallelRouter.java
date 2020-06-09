@@ -7,11 +7,11 @@ import lombok.extern.slf4j.Slf4j;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Set;
 import java.util.concurrent.Callable;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
-import java.util.stream.Collectors;
 
 /**
  * This is a parallel smart order implementation that makes dispatch time adjustments in an effort
@@ -93,12 +93,12 @@ public class ParallelRouter extends AbstractRouter
 
     private List<Long> getLatencyAdjustments()
     {
-        List<Venue> venues = getTargetVanues();
+        Set<Venue> venues = routes.keySet();
         long max = getMaxLatency(venues);
         return calculateAdjustments(venues, max);
     }
 
-    private List<Long> calculateAdjustments(List<Venue> venues, long max)
+    private List<Long> calculateAdjustments(Set<Venue> venues, long max)
     {
         List<Long> adjustments = new ArrayList<>();
         for (Venue venue : venues)
@@ -110,7 +110,7 @@ public class ParallelRouter extends AbstractRouter
         return adjustments;
     }
 
-    private long getMaxLatency(List<Venue> venues)
+    private long getMaxLatency(Set<Venue> venues)
     {
         long max = 0;
         for (Venue venue : venues)
@@ -122,13 +122,5 @@ public class ParallelRouter extends AbstractRouter
             }
         }
         return max;
-    }
-
-    private List<Venue> getTargetVanues()
-    {
-        return targets
-                .stream()
-                .map(VenuePropertyPair::getVenue)
-                .collect(Collectors.toList());
     }
 }

@@ -1,5 +1,6 @@
 package com.h2o_execution.smart_order_router.core;
 
+import com.h2o_execution.smart_order_router.domain.Currency;
 import com.h2o_execution.smart_order_router.domain.Order;
 import com.h2o_execution.smart_order_router.domain.Side;
 import com.h2o_execution.smart_order_router.domain.Venue;
@@ -16,9 +17,9 @@ public class ConsolidatedOrderBookImpl implements ConsolidatedOrderBook
 {
     private static final int BUY = 0;
     private static final int SELL = 1;
-    // Maps symbols to their buy and sell side COBs. Each COB has a mapping of price points to a list of volume venue claim pairs.
-    private Map<String, Map<Double, Map<Venue, VolumeClaimPair>>[]> cob;
+    private Map<String, Map<Currency, Map<Double, Map<Venue, VolumeClaimPair>>[]>> orderBookMap;
     private Map<String, Order> orderMap;
+    private FXRatesService fxRatesService;
 
     @Data
     @Builder
@@ -30,7 +31,9 @@ public class ConsolidatedOrderBookImpl implements ConsolidatedOrderBook
         private int quantity;
         private double limitPx;
         private Side side;
-        private Country country; // Optional parameter
+        private Currency baseCurrency;
+        private Set<Currency> currencies;
+        private Set<Country> countries;
     }
 
     @Data
@@ -59,71 +62,75 @@ public class ConsolidatedOrderBookImpl implements ConsolidatedOrderBook
 
     public ConsolidatedOrderBookImpl()
     {
-        this.cob = new ConcurrentHashMap<>();
+        this.orderBookMap = new ConcurrentHashMap<>();
         this.orderMap = new HashMap<>();
     }
 
-    private Map<Double, Map<Venue, VolumeClaimPair>> getOrderBook(String symbol, Side clientSide)
+    private Map<Double, Map<Venue, VolumeClaimPair>> getOrderBook(String symbol, Currency currency, Side clientSide)
     {
-        return cob.get(symbol)[clientSide == Side.BUY ? SELL : BUY];
+        return orderBookMap.get(symbol).get(currency)[sideIndex(clientSide)];
     }
 
-    private Map<Venue, VolumeClaimPair> getVenueClaimPairMap(String symbol, Side clientSide, double price)
+    private Map<Venue, VolumeClaimPair> getVenueClaimPairMap(String symbol, Side clientSide, double price, Currency currency)
     {
-        Map<Double, Map<Venue, VolumeClaimPair>> ob = getOrderBook(symbol, clientSide);
+        Map<Double, Map<Venue, VolumeClaimPair>> ob = getOrderBook(symbol, currency, clientSide);
         return ob.get(price);
     }
 
     @Override
     public Map<Venue, Integer> claimLiquidity(LiquidityQuery q)
     {
-        Map<Venue, Integer> allotedLiquiditiy = new HashMap<>();
-        Set<Entry<Double, Map<Venue, VolumeClaimPair>>> withinLimit = getCompatiblePricePoints(q);
-        int orderQuantity = q.getQuantity();
-        int currentClaimed = 0;
-        Iterator<Entry<Double, Map<Venue, VolumeClaimPair>>> ppIter = withinLimit.iterator();
-        for
-        (
-                Entry<Double, Map<Venue, VolumeClaimPair>> pricePoint = ppIter.next();
-                ppIter.hasNext();
-                pricePoint = ppIter.next()
-        )
+        Map<Venue, Integer> allotted = new HashMap<>();
+        List<Entry<Double, Map<Venue, VolumeClaimPair>>> withinLimit = getCompatiblePricePoints(q);
+        int orderQuantity = q.getQuantity(), currentClaimed = 0;
+        for (Entry<Double, Map<Venue, VolumeClaimPair>> pricePoint : withinLimit)
         {
-            Iterator<Entry<Venue, VolumeClaimPair>> vvcpIter = pricePoint.getValue().entrySet().iterator();
-            for
-            (
-                    Entry<Venue, VolumeClaimPair> vvcp = vvcpIter.next();
-                    vvcpIter.hasNext();
-                    vvcp = vvcpIter.next())
+            for (Entry<Venue, VolumeClaimPair> volumeVenueClaimPair : pricePoint.getValue().entrySet())
             {
-                int leftToClaim = orderQuantity - currentClaimed;
-                VolumeClaimPair vcp = vvcp.getValue();
-                final int finalCurrentClaimed = currentClaimed + vcp.claim(leftToClaim); // 'final' needed for lambda merge
-                currentClaimed += finalCurrentClaimed;
-                allotedLiquiditiy.merge(vvcp.getKey(), 0, (k, v) ->  finalCurrentClaimed + v);
-                if ( currentClaimed == orderQuantity )
+                Venue venue = volumeVenueClaimPair.getKey();
+                if (venue.isAvailable())
                 {
-                    return allotedLiquiditiy;
+                    int leftToClaim = orderQuantity - currentClaimed;
+                    VolumeClaimPair vcp = volumeVenueClaimPair.getValue();
+                    final int finalCurrentClaimed = vcp.claim(leftToClaim);
+                    currentClaimed += finalCurrentClaimed;
+                    allotted.merge(volumeVenueClaimPair.getKey(), 0, (k, v) ->  finalCurrentClaimed + v);
+                    if ( currentClaimed == orderQuantity )
+                    {
+                        return allotted;
+                    }
                 }
             }
         }
         throw new RuntimeException("No allotted liquidity!");
     }
 
-    private Set<Entry<Double, Map<Venue, VolumeClaimPair>>> getCompatiblePricePoints(LiquidityQuery q)
+    private List<Entry<Double, Map<Venue, VolumeClaimPair>>> getCompatiblePricePoints(LiquidityQuery q)
     {
-        Map<Double, Map<Venue, VolumeClaimPair>> orderBook = getOrderBook(q.getSymbol(), q.getSide());
-        return orderBook
+        return orderBookMap
+                .get(q.getSymbol())
                 .entrySet()
                 .stream()
-                .filter(pricePoint -> pricePoint.getKey() < q.getLimitPx())
-                .collect(Collectors.toSet());
+                .filter(x -> q.getCurrencies().contains(x.getKey()))
+                .flatMap(x ->
+                {
+                    Map<Double, Map<Venue, VolumeClaimPair>> ppToVenues = x.getValue()[sideIndex(q.getSide())];
+                    double fxRate = fxRatesService.getFXRate(q.getBaseCurrency(), x.getKey());
+                    return
+                            ppToVenues
+                            .entrySet()
+                            .stream()
+                            .map(venueVolumeClaimPairMap -> new AbstractMap.SimpleEntry<Double, Map<Venue, VolumeClaimPair>>(venueVolumeClaimPairMap.getKey() * fxRate, venueVolumeClaimPairMap.getValue()));
+                })
+                .filter(x -> x.getKey() < q.getLimitPx())
+                .collect(Collectors.toList());
     }
 
     @Override
     public void addOrder(Venue venue, Order order)
     {
-        getVenueClaimPairMap(order.getSymbol(), order.getSide(), order.getLimitPrice());
+        Map<Venue, VolumeClaimPair> venueClaimPairMap = getVenueClaimPairMap(order.getSymbol(), order.getSide(), order.getLimitPrice(), venue.getCurrency());
+        venueClaimPairMap.get(venue).incVol(order.getLeaves());
     }
 
     @Override
@@ -154,11 +161,17 @@ public class ConsolidatedOrderBookImpl implements ConsolidatedOrderBook
 
     private void incVol(Order old, int diff)
     {
-        cob
-                .get(old.getSymbol())[old.getSide() == Side.BUY ? SELL : BUY]
+        orderBookMap
+                .get(old.getSymbol())
+                .get(old.getCurrency())[sideIndex(old.getSide())]
                 .get(old.getLimitPrice())
                 .get(old.getVenue())
                 .incVol(diff);
+    }
+
+    private int sideIndex(Side side)
+    {
+        return side == Side.BUY ? SELL : BUY;
     }
 
     @Override
