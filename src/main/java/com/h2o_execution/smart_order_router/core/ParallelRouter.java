@@ -7,7 +7,7 @@ import lombok.extern.slf4j.Slf4j;
 
 import java.util.ArrayList;
 import java.util.List;
-import java.util.Set;
+import java.util.Map;
 import java.util.concurrent.Callable;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ExecutorService;
@@ -40,12 +40,12 @@ public class ParallelRouter extends AbstractRouter
     {
         int threadCount = Math.min(MAX_PARALLELISM, toRoute.size());
         List<Callable<Void>> sendTasks = new ArrayList<>();
-        List<Long> latencyAdjustments = getLatencyAdjustments();
+        long max = getMaxLatency();
         CountDownLatch countDownLatch = new CountDownLatch(threadCount);
-        for (int i = 0; i < toRoute.size(); i++)
+
+        for (VenuePropertyPair<Order> vpp : toRoute)
         {
-            VenuePropertyPair<Order> vpp = toRoute.get(i);
-            long latencyAdjustment = latencyAdjustments.get(i);
+            long latencyAdjustment = max - vpp.getVenue().getAvgLatency();
             Callable<Void> sendTask = buildChildOrderSendTask(countDownLatch, vpp, latencyAdjustment);
             sendTasks.add(sendTask);
         }
@@ -91,29 +91,10 @@ public class ParallelRouter extends AbstractRouter
         };
     }
 
-    private List<Long> getLatencyAdjustments()
-    {
-        Set<Venue> venues = routes.keySet();
-        long max = getMaxLatency(venues);
-        return calculateAdjustments(venues, max);
-    }
-
-    private List<Long> calculateAdjustments(Set<Venue> venues, long max)
-    {
-        List<Long> adjustments = new ArrayList<>();
-        for (Venue venue : venues)
-        {
-            long thisVenueLatency = venue.getAvgLatency();
-            long adjustment = max - thisVenueLatency;
-            adjustments.add(adjustment);
-        }
-        return adjustments;
-    }
-
-    private long getMaxLatency(Set<Venue> venues)
+    private long getMaxLatency()
     {
         long max = 0;
-        for (Venue venue : venues)
+        for (Venue venue : routes.keySet())
         {
             long latency = venue.getAvgLatency();
             if (latency > max)
