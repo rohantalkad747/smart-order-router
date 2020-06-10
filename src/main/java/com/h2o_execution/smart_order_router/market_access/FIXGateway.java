@@ -6,6 +6,7 @@ import quickfix.*;
 import quickfix.field.ApplVerID;
 import quickfix.fix42.ExecutionReport;
 import quickfix.fix42.MessageCracker;
+import quickfix.fix42.NewOrderSingle;
 import quickfix.fix42.Reject;
 
 @Slf4j
@@ -25,6 +26,12 @@ public class FIXGateway extends MessageCracker implements Application
         SocketAcceptor socketAcceptor = new SocketAcceptor(application, fileStoreFactory,
                 settings, fileLogFactory, messageFactory);
         socketAcceptor.start();
+    }
+
+    @Override
+    public void onMessage(NewOrderSingle message, SessionID sessionID) throws FieldNotFound, UnsupportedMessageType, IncorrectTagValue
+    {
+        super.onMessage(message, sessionID);
     }
 
     @Override

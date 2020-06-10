@@ -1,13 +1,19 @@
 # Cross-Border SOR
 
+#### Description
+
+This is an implementation of a cross-border, multi-venue (dark & lit) smart order router.  
+
 #### Project Components
 
 - Consolidated Order Book for Order Sweeping
 - Probabilistic Model for Venue Posting (Lit & Dark)
 - FIX 4.2 Gateway for sending single orders and receiving rejects and executions
-- FX Service for calculating best execution across NA venues
-- Order Generation Throttling
+- FX Service for calculating best execution across international venues
 
+### High-Level Diagram
+
+![Alt text](src/main/resources/sor.png?raw=true "Title")
 
 ### Research Notes
 

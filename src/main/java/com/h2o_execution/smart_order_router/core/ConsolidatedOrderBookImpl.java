@@ -21,8 +21,9 @@ public class ConsolidatedOrderBookImpl implements ConsolidatedOrderBook
     private final Map<String, Order> orderMap;
     private FXRatesService fxRatesService;
 
-    public ConsolidatedOrderBookImpl()
+    public ConsolidatedOrderBookImpl(FXRatesService fxRatesService)
     {
+        this.fxRatesService = fxRatesService;
         this.orderBookMap = new ConcurrentHashMap<>();
         this.orderMap = new HashMap<>();
     }
