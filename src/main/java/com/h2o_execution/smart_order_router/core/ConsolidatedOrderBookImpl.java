@@ -7,19 +7,24 @@ import com.h2o_execution.smart_order_router.domain.Venue;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
+import lombok.extern.slf4j.Slf4j;
+import org.springframework.stereotype.Service;
 
 import java.util.*;
 import java.util.Map.Entry;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.ExecutionException;
 import java.util.stream.Collectors;
 
+@Slf4j
+@Service
 public class ConsolidatedOrderBookImpl implements ConsolidatedOrderBook
 {
     private static final int BUY = 0;
     private static final int SELL = 1;
-    private final Map<String, Map<Currency, Map<Double, Map<Venue, VolumeClaimPair>>[]>> orderBookMap;
+    private final Map<String, Map<Currency, List<Map<Double, Map<Venue, VolumeClaimPair>>>>> orderBookMap;
     private final Map<String, Order> orderMap;
-    private FXRatesService fxRatesService;
+    private final FXRatesService fxRatesService;
 
     public ConsolidatedOrderBookImpl(FXRatesService fxRatesService)
     {
@@ -30,13 +35,22 @@ public class ConsolidatedOrderBookImpl implements ConsolidatedOrderBook
 
     private Map<Double, Map<Venue, VolumeClaimPair>> getOrderBook(String symbol, Currency currency, Side clientSide)
     {
-        return orderBookMap.get(symbol).get(currency)[sideIndex(clientSide)];
+        return orderBookMap
+                .computeIfAbsent(symbol, k -> new EnumMap<>(Currency.class))
+                .computeIfAbsent(currency, k ->
+                {
+                    List<Map<Double, Map<Venue, VolumeClaimPair>>> arr = new ArrayList<>(2);
+                    arr.add(new HashMap<>());
+                    arr.add(new HashMap<>());
+                    return arr;
+                })
+                .get(sideIndex(clientSide));
     }
 
     private Map<Venue, VolumeClaimPair> getVenueClaimPairMap(String symbol, Side clientSide, double price, Currency currency)
     {
         Map<Double, Map<Venue, VolumeClaimPair>> ob = getOrderBook(symbol, currency, clientSide);
-        return ob.get(price);
+        return ob.computeIfAbsent(price, k -> new HashMap<>());
     }
 
     @Override
@@ -77,14 +91,30 @@ public class ConsolidatedOrderBookImpl implements ConsolidatedOrderBook
                 .filter(x -> q.getCurrencies().contains(x.getKey()))
                 .flatMap(x ->
                 {
-                    Map<Double, Map<Venue, VolumeClaimPair>> ppToVenues = x.getValue()[sideIndex(q.getSide())];
-                    double fxRate = againstBase.computeIfAbsent(x.getKey(), k -> fxRatesService.getFXRate(q.getBaseCurrency(), x.getKey()));
+                    Map<Double, Map<Venue, VolumeClaimPair>> ppToVenues = x.getValue().get(sideIndex(q.getSide()));
+                    Double fxRate = againstBase.computeIfAbsent(x.getKey(), k ->
+                    {
+                        try
+                        {
+                            return fxRatesService.getFXRate(q.getBaseCurrency(), x.getKey());
+                        }
+                        catch (ExecutionException e)
+                        {
+                            log.error("Exec exception when getting fx rate", e);
+                        }
+                        return null;
+                    });
+                    if (fxRate == null)
+                    {
+                        return null;
+                    }
                     return
                             ppToVenues
                                     .entrySet()
                                     .stream()
                                     .map(venueVolumeClaimPairMap -> new AbstractMap.SimpleEntry<Double, Map<Venue, VolumeClaimPair>>(venueVolumeClaimPairMap.getKey() * fxRate, venueVolumeClaimPairMap.getValue()));
                 })
+                .filter(Objects::nonNull)
                 .filter(x -> q.side == Side.BUY ? x.getKey() <= q.getLimitPx() : x.getKey() >= q.getLimitPx())
                 .collect(Collectors.toList());
     }
@@ -126,7 +156,8 @@ public class ConsolidatedOrderBookImpl implements ConsolidatedOrderBook
     {
         orderBookMap
                 .get(old.getSymbol())
-                .get(old.getCurrency())[sideIndex(old.getSide())]
+                .get(old.getCurrency())
+                .get(sideIndex(old.getSide()))
                 .get(old.getLimitPrice())
                 .get(old.getVenue())
                 .incVol(diff);
