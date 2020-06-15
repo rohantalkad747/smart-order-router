@@ -10,6 +10,7 @@ import lombok.NoArgsConstructor;
 import java.time.LocalDateTime;
 import java.time.ZoneId;
 import java.time.ZonedDateTime;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
@@ -26,11 +27,11 @@ public class Venue
     private Currency currency;
     private Type type;
     private List<String> symbols;
-    private Map<String, Rank> symbolRankMap;
     private HolidayMaster holidayMaster;
-    private long avgLatency;
+    private int avgLatency;
     private Bell open;
     private Bell close;
+    private final Map<String, Rank> symbolRankMap = new HashMap<>();
 
     public boolean isAvailable()
     {
@@ -39,8 +40,7 @@ public class Venue
             return false;
         }
         ZonedDateTime zonedDateTime = LocalDateTime.now().atZone(timeZone);
-        return holidayMaster.isHoliday(this) ||
-                beforeOpeningBell(zonedDateTime) ||
+        return beforeOpeningBell(zonedDateTime) ||
                 afterClosingBell(zonedDateTime);
 
     }
@@ -53,6 +53,11 @@ public class Venue
     private boolean beforeOpeningBell(ZonedDateTime localDateTime)
     {
         return localDateTime.getHour() < close.hours && localDateTime.getMinute() < close.minutes;
+    }
+
+    public void setRanking(String symbol, Rank rank)
+    {
+        symbolRankMap.put(symbol, rank);
     }
 
     public enum Type

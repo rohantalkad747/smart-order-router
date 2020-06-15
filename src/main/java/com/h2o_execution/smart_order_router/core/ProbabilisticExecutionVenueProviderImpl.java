@@ -17,6 +17,7 @@ public class ProbabilisticExecutionVenueProviderImpl implements ProbabilisticExe
     public ProbabilisticExecutionVenueProviderImpl(List<Venue> venues)
     {
         this.venues = venues;
+        this.symbolVenueMap = new HashMap<>();
         initSymbolVenueMap();
     }
 

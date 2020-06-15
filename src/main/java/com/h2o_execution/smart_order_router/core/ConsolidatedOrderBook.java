@@ -10,5 +10,5 @@ public interface ConsolidatedOrderBook extends OrderModificationEventsListener
 
     Map<Venue, Integer> claimLiquidity(ConsolidatedOrderBookImpl.LiquidityQuery q);
 
-    void addOrder(Venue venue, Order order);
+    void addOrder(Order order);
 }

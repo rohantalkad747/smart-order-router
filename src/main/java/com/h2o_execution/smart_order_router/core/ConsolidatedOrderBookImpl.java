@@ -4,9 +4,7 @@ import com.h2o_execution.smart_order_router.domain.Currency;
 import com.h2o_execution.smart_order_router.domain.Order;
 import com.h2o_execution.smart_order_router.domain.Side;
 import com.h2o_execution.smart_order_router.domain.Venue;
-import lombok.AllArgsConstructor;
-import lombok.Builder;
-import lombok.Data;
+import lombok.*;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 
@@ -17,6 +15,7 @@ import java.util.concurrent.ExecutionException;
 import java.util.stream.Collectors;
 
 @Slf4j
+@ToString
 @Service
 public class ConsolidatedOrderBookImpl implements ConsolidatedOrderBook
 {
@@ -83,7 +82,6 @@ public class ConsolidatedOrderBookImpl implements ConsolidatedOrderBook
 
     private List<Entry<Double, Map<Venue, VolumeClaimPair>>> getCompatiblePricePoints(LiquidityQuery q)
     {
-        Map<Currency, Double> againstBase = new HashMap<>();
         return orderBookMap
                 .get(q.getSymbol())
                 .entrySet()
@@ -92,27 +90,19 @@ public class ConsolidatedOrderBookImpl implements ConsolidatedOrderBook
                 .flatMap(x ->
                 {
                     Map<Double, Map<Venue, VolumeClaimPair>> ppToVenues = x.getValue().get(sideIndex(q.getSide()));
-                    Double fxRate = againstBase.computeIfAbsent(x.getKey(), k ->
+                    try
                     {
-                        try
-                        {
-                            return fxRatesService.getFXRate(q.getBaseCurrency(), x.getKey());
-                        }
-                        catch (ExecutionException e)
-                        {
-                            log.error("Exec exception when getting fx rate", e);
-                        }
-                        return null;
-                    });
-                    if (fxRate == null)
+                        Double fxRate = fxRatesService.getFXRate(q.getBaseCurrency(), x.getKey());
+                        return
+                                ppToVenues
+                                        .entrySet()
+                                        .stream()
+                                        .map(venueVolumeClaimPairMap -> new AbstractMap.SimpleEntry<Double, Map<Venue, VolumeClaimPair>>(venueVolumeClaimPairMap.getKey() * fxRate, venueVolumeClaimPairMap.getValue()));
+                    }
+                    catch (ExecutionException e)
                     {
                         return null;
                     }
-                    return
-                            ppToVenues
-                                    .entrySet()
-                                    .stream()
-                                    .map(venueVolumeClaimPairMap -> new AbstractMap.SimpleEntry<Double, Map<Venue, VolumeClaimPair>>(venueVolumeClaimPairMap.getKey() * fxRate, venueVolumeClaimPairMap.getValue()));
                 })
                 .filter(Objects::nonNull)
                 .filter(x -> q.side == Side.BUY ? x.getKey() <= q.getLimitPx() : x.getKey() >= q.getLimitPx())
@@ -120,18 +110,26 @@ public class ConsolidatedOrderBookImpl implements ConsolidatedOrderBook
     }
 
     @Override
-    public void addOrder(Venue venue, Order order)
+    public void addOrder(Order order)
     {
-        Map<Venue, VolumeClaimPair> venueClaimPairMap = getVenueClaimPairMap(order.getSymbol(), order.getSide(), order.getLimitPrice(), venue.getCurrency());
-        venueClaimPairMap.get(venue).incVol(order.getLeaves());
+        Map<Venue, VolumeClaimPair> venueClaimPairMap = getVenueClaimPairMap(order.getSymbol(), order.getSide(), order.getLimitPrice(), order.getVenue().getCurrency());
+        venueClaimPairMap.computeIfAbsent(order.getVenue(), k -> new VolumeClaimPair()).incVol(order.getLeaves());
+        orderMap.put(order.getClientOrderId(), order);
     }
 
     @Override
     public void onExecution(String clientOrderId, int shares)
     {
         Order old = orderMap.get(clientOrderId);
-        orderMap.remove(clientOrderId);
-        incVol(old, -(shares));
+        synchronized (old)
+        {
+            old.updateCumulativeQuantity(shares);
+            incVol(old, -(shares));
+            if (old.isTerminal())
+            {
+                orderMap.remove(clientOrderId);
+            }
+        }
     }
 
     @Override
@@ -139,7 +137,7 @@ public class ConsolidatedOrderBookImpl implements ConsolidatedOrderBook
     {
         Order order = orderMap.get(id);
         incVol(order, -(order.getLeaves()));
-        order.setQuantity(0);
+        orderMap.remove(id);
     }
 
     @Override
@@ -155,10 +153,10 @@ public class ConsolidatedOrderBookImpl implements ConsolidatedOrderBook
     private void incVol(Order old, int diff)
     {
         orderBookMap
-                .get(old.getSymbol())
-                .get(old.getCurrency())
+                .computeIfAbsent(old.getSymbol(), k -> new EnumMap<>(Currency.class))
+                .computeIfAbsent(old.getCurrency(), k -> new ArrayList<>())
                 .get(sideIndex(old.getSide()))
-                .get(old.getLimitPrice())
+                .computeIfAbsent(old.getLimitPrice(), k -> new HashMap<>())
                 .get(old.getVenue())
                 .incVol(diff);
     }
@@ -189,11 +187,14 @@ public class ConsolidatedOrderBookImpl implements ConsolidatedOrderBook
         private Set<Country> countries;
     }
 
+
+
+
     @Data
     private static class VolumeClaimPair
     {
-        private volatile int totalVolume;
-        private volatile int claimed;
+        private volatile int totalVolume = 0;
+        private volatile int claimed = 0;
 
         /**
          * Attempts the claim the given {@code amount}.

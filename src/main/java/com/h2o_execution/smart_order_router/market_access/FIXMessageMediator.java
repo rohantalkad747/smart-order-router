@@ -1,5 +1,6 @@
 package com.h2o_execution.smart_order_router.market_access;
 
+import com.h2o_execution.smart_order_router.core.OrderEventsListener;
 import com.h2o_execution.smart_order_router.domain.Venue;
 import lombok.AllArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -10,13 +11,16 @@ import quickfix.fix42.ExecutionReport;
 import quickfix.fix42.NewOrderSingle;
 import quickfix.fix42.Reject;
 
+import java.util.HashMap;
+import java.util.Map;
+
 @Slf4j
 @AllArgsConstructor
 public class FIXMessageMediator
 {
     private final FIXGateway gateway;
-    private final OrderManager orderManager;
     private final VenueSessionRegistry venueSessionRegistry;
+    private final Map<String, OrderEventsListener> orderEventsListenerMap = new HashMap<>();
 
     public void fireConnectEvent(SessionID sessionID)
     {
@@ -28,10 +32,11 @@ public class FIXMessageMediator
         venueSessionRegistry.onDisconnect(sessionID);
     }
 
-    public void fireNewOrderEvent(Venue venue, NewOrderSingle order)
+    public void fireNewOrderEvent(Venue venue, NewOrderSingle order, OrderEventsListener orderEventsListener) throws Exception
     {
         SessionID session = venueSessionRegistry.getSession(venue);
         gateway.sendMessage(session, order);
+        orderEventsListenerMap.put(order.getClOrdID().getValue(), orderEventsListener);
     }
 
     public void fireReceiveExecutionReport(ExecutionReport executionReport)
@@ -40,7 +45,7 @@ public class FIXMessageMediator
         {
             String clOrdId = executionReport.getClOrdID().getValue();
             int amount = (int) executionReport.getLastShares().getValue();
-            orderManager.onExecution(clOrdId, amount);
+            orderEventsListenerMap.get(clOrdId).onExecution(clOrdId, amount);
         }
         catch (FieldNotFound fieldNotFound)
         {
@@ -52,7 +57,9 @@ public class FIXMessageMediator
     {
         try
         {
-            orderManager.onReject(reject.getString(ClOrdID.FIELD));
+            String clorid = reject.getString(ClOrdID.FIELD);
+            orderEventsListenerMap.get(clorid).onReject(clorid);
+
         }
         catch (FieldNotFound fieldNotFound)
         {

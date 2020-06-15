@@ -111,6 +111,8 @@ public abstract class AbstractRouter implements Router
                 .countries(routingConfig.getCountrySet())
                 .limitPx(order.getLimitPrice())
                 .symbol(order.getSymbol())
+                .baseCurrency(routingConfig.getBaseCurrency())
+                .currencies(routingConfig.getAvailableCapital().keySet())
                 .quantity(order.getLeaves())
                 .side(order.getSide())
                 .build();

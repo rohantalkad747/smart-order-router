@@ -6,6 +6,7 @@ import com.h2o_execution.smart_order_router.core.Router;
 import com.h2o_execution.smart_order_router.domain.Order;
 import com.h2o_execution.smart_order_router.domain.OrderType;
 import com.h2o_execution.smart_order_router.domain.Venue;
+import lombok.extern.slf4j.Slf4j;
 import quickfix.field.*;
 import quickfix.fix42.NewOrderSingle;
 
@@ -13,6 +14,7 @@ import java.time.LocalDateTime;
 import java.util.HashMap;
 import java.util.Map;
 
+@Slf4j
 public class OrderManager implements IOrderManager, OrderEventsListener
 {
     private final Map<String, Router> activeRouters;
@@ -48,8 +50,15 @@ public class OrderManager implements IOrderManager, OrderEventsListener
     public void sendOrder(Venue v, Order order, Router router)
     {
         NewOrderSingle newOrderSingle = buildNewOrderSingle(order);
-        fixMessageMediator.fireNewOrderEvent(v, newOrderSingle);
-        activeRouters.put(order.getClientOrderId(), router);
+        try
+        {
+            fixMessageMediator.fireNewOrderEvent(v, newOrderSingle, this);
+            activeRouters.put(order.getClientOrderId(), router);
+        }
+        catch (Exception e)
+        {
+            log.error("Exception during sending order", e);
+        }
     }
 
     @Override

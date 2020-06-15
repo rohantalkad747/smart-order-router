@@ -22,6 +22,14 @@ public class ParallelRouter extends AbstractRouter
     private static final int MAX_PARALLELISM = Runtime.getRuntime().availableProcessors();
     private final List<VenuePropertyPair<Order>> toRoute;
 
+    /**
+     *
+     * @param orderManager
+     * @param orderIdService
+     * @param probabilisticExecutionVenueProvider
+     * @param consolidatedOrderBook
+     * @param routingConfig
+     */
     public ParallelRouter(OrderManager orderManager, OrderIdService orderIdService, ProbabilisticExecutionVenueProvider probabilisticExecutionVenueProvider, ConsolidatedOrderBook consolidatedOrderBook, RoutingConfig routingConfig)
     {
         super(orderIdService, orderManager, probabilisticExecutionVenueProvider, consolidatedOrderBook, routingConfig);
@@ -39,12 +47,12 @@ public class ParallelRouter extends AbstractRouter
     {
         int threadCount = Math.min(MAX_PARALLELISM, toRoute.size());
         List<Callable<Void>> sendTasks = new ArrayList<>();
-        long max = getMaxLatency();
+        int max = getMaxLatency();
         CountDownLatch countDownLatch = new CountDownLatch(threadCount);
 
         for (VenuePropertyPair<Order> vpp : toRoute)
         {
-            long latencyAdjustment = max - vpp.getVenue().getAvgLatency();
+            int latencyAdjustment = max - vpp.getVenue().getAvgLatency();
             Callable<Void> sendTask = buildChildOrderSendTask(countDownLatch, vpp, latencyAdjustment);
             sendTasks.add(sendTask);
         }
@@ -90,17 +98,13 @@ public class ParallelRouter extends AbstractRouter
         };
     }
 
-    private long getMaxLatency()
+    private int getMaxLatency()
     {
-        long max = 0;
-        for (Venue venue : routes.keySet())
-        {
-            long latency = venue.getAvgLatency();
-            if (latency > max)
-            {
-                max = latency;
-            }
-        }
-        return max;
+        return routes
+                .keySet()
+                .stream()
+                .map(Venue::getAvgLatency)
+                .max(Integer::compareTo)
+                .orElse(0);
     }
 }
