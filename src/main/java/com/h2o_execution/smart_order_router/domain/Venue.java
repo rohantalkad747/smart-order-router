@@ -40,7 +40,7 @@ public class Venue
             return false;
         }
         ZonedDateTime zonedDateTime = LocalDateTime.now().atZone(timeZone);
-        return beforeOpeningBell(zonedDateTime) ||
+        return  beforeOpeningBell(zonedDateTime) ||
                 afterClosingBell(zonedDateTime);
 
     }
