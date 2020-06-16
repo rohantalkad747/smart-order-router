@@ -22,6 +22,13 @@ public class FIXMessageMediator
     private final VenueSessionRegistry venueSessionRegistry;
     private final Map<String, OrderEventsListener> orderEventsListenerMap = new HashMap<>();
 
+//    private static final String ROOT_DIR = System.getProperty("java.io.tmpdir") + File.separator;
+//
+//    private List<MessageListener> listeners = new LinkedList<>();
+//    private IndexedChronicle chr;
+//    private IndexedChronicle idxChr;
+
+
     public void fireConnectEvent(SessionID sessionID)
     {
         venueSessionRegistry.onConnect(sessionID);

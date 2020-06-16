@@ -38,6 +38,10 @@ dependencies {
 	// https://mvnrepository.com/artifact/org.quickfixj/quickfixj-messages-all
 	compile group: 'org.quickfixj', name: 'quickfixj-messages-all', version: '2.1.1'
 
+	// https://mvnrepository.com/artifact/net.openhft/chronicle-queue
+	compile group: 'net.openhft', name: 'chronicle-queue', version: '5.19.32'
+
+
 
 }
 

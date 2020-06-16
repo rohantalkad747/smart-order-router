@@ -86,7 +86,12 @@ public class ParallelRouter extends AbstractRouter
             try
             {
                 Thread.sleep(latencyAdjustment);
-                orderManager.sendOrder(vpp.getVenue(), vpp.getVal(), this);
+                try
+                {
+                    orderManager.sendOrder(vpp.getVenue(), vpp.getVal(), this);
+                }
+                catch (Exception e) { }
+                log.info("Sent child order " + vpp.getVal().toString());
                 countDownLatch.countDown();
             }
             catch (InterruptedException e)

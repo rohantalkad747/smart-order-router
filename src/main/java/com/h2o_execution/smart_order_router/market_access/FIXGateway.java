@@ -16,15 +16,13 @@ public class FIXGateway extends MessageCracker implements Application
     @Setter
     private FIXMessageMediator fixMessageMediator;
 
-    public static void main(String[] args) throws Exception
+    public FIXGateway() throws ConfigError
     {
         SessionSettings settings = new SessionSettings(CONFIG);
-        Application application = new FIXGateway();
         FileStoreFactory fileStoreFactory = new FileStoreFactory(settings);
         MessageFactory messageFactory = new DefaultMessageFactory();
         FileLogFactory fileLogFactory = new FileLogFactory(settings);
-        SocketAcceptor socketAcceptor = new SocketAcceptor(application, fileStoreFactory,
-                settings, fileLogFactory, messageFactory);
+        SocketAcceptor socketAcceptor = new SocketAcceptor(this, fileStoreFactory, settings, fileLogFactory, messageFactory);
         socketAcceptor.start();
     }
 

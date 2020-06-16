@@ -62,8 +62,8 @@ public class FXRatesServiceImpl implements FXRatesService
 
     public double getRealTimeFXRate(Currency target, Currency against)
     {
-        String url = "https://api.exchangeratesapi.io/latest?base=" + target.toString() + "&symbols=" + against.toString();
+        String url = "https://api.exchangeratesapi.io/latest?base=" + against.toString() + "&symbols=" + target.toString();
         JsonNode forObject = restTemplate.getForObject(url, JsonNode.class);
-        return forObject.get("rates").get(against.toString()).asDouble();
+        return forObject.get("rates").get(target.toString()).asDouble();
     }
 }

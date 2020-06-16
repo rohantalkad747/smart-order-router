@@ -13,7 +13,7 @@ This is an implementation of a cross-border, multi-venue (lit & dark) smart orde
 
 ### High-Level Diagram
 
-![Alt text](src/main/resources/sor.png?raw=true "Title")
+![Alt text](doc/sor.png?raw=true "Title")
 
 ### Research Notes
 

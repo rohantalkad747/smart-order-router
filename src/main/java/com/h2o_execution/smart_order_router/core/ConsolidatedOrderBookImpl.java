@@ -13,6 +13,7 @@ import java.util.Map.Entry;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ExecutionException;
 import java.util.stream.Collectors;
+import java.util.stream.Stream;
 
 @Slf4j
 @ToString
@@ -87,26 +88,30 @@ public class ConsolidatedOrderBookImpl implements ConsolidatedOrderBook
                 .entrySet()
                 .stream()
                 .filter(x -> q.getCurrencies().contains(x.getKey()))
-                .flatMap(x ->
-                {
-                    Map<Double, Map<Venue, VolumeClaimPair>> ppToVenues = x.getValue().get(sideIndex(q.getSide()));
-                    try
-                    {
-                        Double fxRate = fxRatesService.getFXRate(q.getBaseCurrency(), x.getKey());
-                        return
-                                ppToVenues
-                                        .entrySet()
-                                        .stream()
-                                        .map(venueVolumeClaimPairMap -> new AbstractMap.SimpleEntry<Double, Map<Venue, VolumeClaimPair>>(venueVolumeClaimPairMap.getKey() * fxRate, venueVolumeClaimPairMap.getValue()));
-                    }
-                    catch (ExecutionException e)
-                    {
-                        return null;
-                    }
-                })
+                .flatMap(x -> toFXAdjustedPp(q, x))
+                .peek(System.out::println)
                 .filter(Objects::nonNull)
                 .filter(x -> q.side == Side.BUY ? x.getKey() <= q.getLimitPx() : x.getKey() >= q.getLimitPx())
                 .collect(Collectors.toList());
+    }
+
+    private Stream<? extends AbstractMap.SimpleEntry<Double, Map<Venue, VolumeClaimPair>>> toFXAdjustedPp(LiquidityQuery q, Entry<Currency, List<Map<Double, Map<Venue, VolumeClaimPair>>>> x)
+    {
+        Map<Double, Map<Venue, VolumeClaimPair>> ppToVenues = x.getValue().get(sideIndex(q.getSide()));
+        try
+        {
+
+            Double fxRate = fxRatesService.getFXRate(x.getKey(), q.getBaseCurrency());
+            return
+                    ppToVenues
+                            .entrySet()
+                            .stream()
+                            .map(venueVolumeClaimPairMap -> new AbstractMap.SimpleEntry<>(venueVolumeClaimPairMap.getKey() * fxRate, venueVolumeClaimPairMap.getValue()));
+        }
+        catch (ExecutionException e)
+        {
+            return null;
+        }
     }
 
     @Override

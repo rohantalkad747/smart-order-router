@@ -24,7 +24,6 @@ public class VenueSessionRegistryImpl implements VenueSessionRegistry
     @Override
     public void onConnect(SessionID sessionID)
     {
-
     }
 
     @Override
