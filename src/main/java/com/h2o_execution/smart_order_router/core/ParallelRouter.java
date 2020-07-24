@@ -9,6 +9,8 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.*;
 
+import static java.lang.Thread.currentThread;
+
 /**
  * This is a parallel smart order implementation that makes dispatch time adjustments in an effort
  * to allow orders to reach their venues at roughly the same time.
@@ -49,7 +51,10 @@ public class ParallelRouter extends AbstractRouter {
                     countDownLatch.countDown();
                 };
                 scheduledExecutorService.schedule(sendOrderTask, latencyAdjustment, TimeUnit.MILLISECONDS);
+                countDownLatch.await();
             }
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
         } finally {
             scheduledExecutorService.shutdown();
         }
