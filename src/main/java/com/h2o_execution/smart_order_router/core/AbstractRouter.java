@@ -16,8 +16,7 @@ import java.util.concurrent.atomic.AtomicInteger;
 
 @Slf4j
 @AllArgsConstructor
-public abstract class AbstractRouter implements Router
-{
+public abstract class AbstractRouter implements Router {
     protected final OrderManager orderManager;
     private final OrderIdService orderIdService;
     private final ProbabilisticExecutionVenueProvider probabilisticExecutionVenueProvider;
@@ -27,8 +26,7 @@ public abstract class AbstractRouter implements Router
     private final Map<String, Order> idOrderMap;
     protected Map<Venue, Integer> routes;
 
-    public AbstractRouter(OrderIdService orderIdService, OrderManager orderManager, ProbabilisticExecutionVenueProvider probabilisticExecutionVenueProvider, ConsolidatedOrderBook consolidatedOrderBook, RoutingConfig routingConfig)
-    {
+    public AbstractRouter(OrderIdService orderIdService, OrderManager orderManager, ProbabilisticExecutionVenueProvider probabilisticExecutionVenueProvider, ConsolidatedOrderBook consolidatedOrderBook, RoutingConfig routingConfig) {
         this.orderIdService = orderIdService;
         this.orderManager = orderManager;
         this.probabilisticExecutionVenueProvider = probabilisticExecutionVenueProvider;
@@ -43,10 +41,8 @@ public abstract class AbstractRouter implements Router
 
     protected abstract void onNewChildOrder(VenuePropertyPair<Order> order);
 
-    public void sliceIntoChildren(Order order, TimeInForce timeInForce)
-    {
-        for (Entry<Venue, Integer> target : routes.entrySet())
-        {
+    public void sliceIntoChildren(Order order, TimeInForce timeInForce) {
+        for (Entry<Venue, Integer> target : routes.entrySet()) {
             int targetLeaves = target.getValue();
             int remaining = order.getLeaves() - totalRouted.get();
             int childQuantity = Math.min(targetLeaves, remaining);
@@ -58,8 +54,7 @@ public abstract class AbstractRouter implements Router
         }
     }
 
-    public Order createChild(Order prnt, Venue venue, int childQuantity, TimeInForce timeInForce, String newId)
-    {
+    public Order createChild(Order prnt, Venue venue, int childQuantity, TimeInForce timeInForce, String newId) {
         return Order
                 .builder()
                 .symbol(prnt.getSymbol())
@@ -76,27 +71,22 @@ public abstract class AbstractRouter implements Router
     }
 
     @Override
-    public void route(Order order)
-    {
-        if (order.isTerminal())
-        {
+    public void route(Order order) {
+        if (order.isTerminal()) {
             throw new RuntimeException("Cannot route a terminal order!");
         }
         createSweepChildOrders(order, routingConfig);
         onDoneCreatingChildOrders();
-        if (orderStillMarketable(order))
-        {
+        if (orderStillMarketable(order)) {
             createPostChildOrders(order, routingConfig);
             onDoneCreatingChildOrders();
         }
     }
 
-    private void createPostChildOrders(Order order, RoutingConfig routingConfig)
-    {
+    private void createPostChildOrders(Order order, RoutingConfig routingConfig) {
         List<VenuePropertyPair<Double>> venueExecutionProbabilityPairs = probabilisticExecutionVenueProvider.getVenueExecutionProbabilityPairs(order.getSymbol(), RoutingStage.POST, routingConfig);
         routes = new HashMap<>();
-        for (VenuePropertyPair<Double> venueExecutionPair : venueExecutionProbabilityPairs)
-        {
+        for (VenuePropertyPair<Double> venueExecutionPair : venueExecutionProbabilityPairs) {
             double executionProbability = venueExecutionPair.getVal();
             int childQuantity = (int) (order.getLeaves() * executionProbability);
             routes.put(venueExecutionPair.getVenue(), childQuantity);
@@ -104,8 +94,7 @@ public abstract class AbstractRouter implements Router
         sliceIntoChildren(order, TimeInForce.DAY);
     }
 
-    private void createSweepChildOrders(Order order, RoutingConfig routingConfig)
-    {
+    private void createSweepChildOrders(Order order, RoutingConfig routingConfig) {
         ConsolidatedOrderBookImpl.LiquidityQuery query = ConsolidatedOrderBookImpl.LiquidityQuery.builder()
                 .type(routingConfig.getSweepType())
                 .countries(routingConfig.getCountrySet())
@@ -120,14 +109,12 @@ public abstract class AbstractRouter implements Router
         sliceIntoChildren(order, TimeInForce.IOC);
     }
 
-    private boolean orderStillMarketable(Order order)
-    {
+    private boolean orderStillMarketable(Order order) {
         return totalRouted.get() != order.getQuantity();
     }
 
     @Override
-    public void onReject(String clientOrderId)
-    {
+    public void onReject(String clientOrderId) {
         Order order = idOrderMap.get(clientOrderId);
         log.warn("Rejection on order", order);
         totalRouted.addAndGet(-(order.getQuantity()));
@@ -135,19 +122,16 @@ public abstract class AbstractRouter implements Router
     }
 
     @Override
-    public void onExecution(String clientOrderId, int shares)
-    {
+    public void onExecution(String clientOrderId, int shares) {
         Order order = idOrderMap.get(clientOrderId);
         order.updateCumulativeQuantity(shares);
-        if (eligibleForRerouting(order))
-        {
+        if (eligibleForRerouting(order)) {
             totalRouted.addAndGet(-(order.getLeaves()));
             route(order);
         }
     }
 
-    private boolean eligibleForRerouting(Order order)
-    {
+    private boolean eligibleForRerouting(Order order) {
         return order.getTimeInForce() == TimeInForce.IOC && !order.isTerminal();
     }
 }

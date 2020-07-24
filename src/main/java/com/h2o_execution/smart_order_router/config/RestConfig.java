@@ -7,12 +7,10 @@ import org.springframework.http.client.SimpleClientHttpRequestFactory;
 import org.springframework.web.client.RestTemplate;
 
 @Configuration
-public class RestConfig
-{
+public class RestConfig {
 
     @Bean
-    public RestTemplate getRestClient()
-    {
+    public RestTemplate getRestClient() {
 
         RestTemplate restClient = new RestTemplate(new BufferingClientHttpRequestFactory(new SimpleClientHttpRequestFactory()));
         return restClient;

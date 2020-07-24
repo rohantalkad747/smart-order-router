@@ -9,16 +9,14 @@ import lombok.NoArgsConstructor;
 @Builder
 @NoArgsConstructor
 @AllArgsConstructor
-public class Rank
-{
+public class Rank {
     private double venueTradingCost;
     private double routerHistoricTradingVolume;
     private double marketHistoricTradingVolume;
     private double immediateTradingVolume;
     private double priceImprovementIndicator;
 
-    public double calculate()
-    {
+    public double calculate() {
         return (venueTradingCost * 0.15) +
                 (routerHistoricTradingVolume * 0.2) +
                 (marketHistoricTradingVolume * 0.1) +

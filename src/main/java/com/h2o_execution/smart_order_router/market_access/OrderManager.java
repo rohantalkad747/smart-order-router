@@ -15,19 +15,16 @@ import java.util.HashMap;
 import java.util.Map;
 
 @Slf4j
-public class OrderManager implements IOrderManager, OrderEventsListener
-{
+public class OrderManager implements IOrderManager, OrderEventsListener {
     private final Map<String, Router> activeRouters;
     private final FIXMessageMediator fixMessageMediator;
 
-    public OrderManager(FIXMessageMediator fixMessageMediator)
-    {
+    public OrderManager(FIXMessageMediator fixMessageMediator) {
         this.fixMessageMediator = fixMessageMediator;
         this.activeRouters = new HashMap<>();
     }
 
-    private NewOrderSingle buildNewOrderSingle(Order order)
-    {
+    private NewOrderSingle buildNewOrderSingle(Order order) {
         NewOrderSingle newOrderSingle = new NewOrderSingle
                 (
                         new ClOrdID(order.getClientOrderId()),
@@ -39,37 +36,30 @@ public class OrderManager implements IOrderManager, OrderEventsListener
                 );
         newOrderSingle.set(new TimeInForce(order.getTimeInForce().getValue()));
         newOrderSingle.set(new Currency(order.getCurrency().name()));
-        if (order.getOrderType() == OrderType.LIMIT)
-        {
+        if (order.getOrderType() == OrderType.LIMIT) {
             newOrderSingle.set(new Price(order.getLimitPrice()));
         }
         return newOrderSingle;
     }
 
     @Override
-    public void sendOrder(Venue v, Order order, Router router)
-    {
+    public void sendOrder(Venue v, Order order, Router router) {
         NewOrderSingle newOrderSingle = buildNewOrderSingle(order);
-        try
-        {
+        try {
             fixMessageMediator.fireNewOrderEvent(v, newOrderSingle, this);
             activeRouters.put(order.getClientOrderId(), router);
-        }
-        catch (Exception e)
-        {
+        } catch (Exception e) {
             log.error("Exception during sending order", e);
         }
     }
 
     @Override
-    public void onExecution(String clientOrderId, int shares)
-    {
+    public void onExecution(String clientOrderId, int shares) {
         activeRouters.get(clientOrderId).onExecution(clientOrderId, shares);
     }
 
     @Override
-    public void onReject(String clientOrderId)
-    {
+    public void onReject(String clientOrderId) {
         activeRouters.get(clientOrderId).onReject(clientOrderId);
     }
 }

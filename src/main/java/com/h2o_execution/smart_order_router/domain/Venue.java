@@ -18,9 +18,9 @@ import java.util.Map;
 @Builder
 @NoArgsConstructor
 @AllArgsConstructor
-public class Venue
-{
+public class Venue {
 
+    private final Map<String, Rank> symbolRankMap = new HashMap<>();
     private Name name;
     private ZoneId timeZone;
     private Country country;
@@ -31,42 +31,34 @@ public class Venue
     private int avgLatency;
     private Bell open;
     private Bell close;
-    private final Map<String, Rank> symbolRankMap = new HashMap<>();
 
-    public boolean isAvailable()
-    {
-        if (holidayMaster.isHoliday(this))
-        {
+    public boolean isAvailable() {
+        if (holidayMaster.isHoliday(this)) {
             return false;
         }
         ZonedDateTime zonedDateTime = LocalDateTime.now().atZone(timeZone);
-        return  beforeOpeningBell(zonedDateTime) ||
+        return beforeOpeningBell(zonedDateTime) ||
                 afterClosingBell(zonedDateTime);
 
     }
 
-    private boolean afterClosingBell(ZonedDateTime localDateTime)
-    {
+    private boolean afterClosingBell(ZonedDateTime localDateTime) {
         return localDateTime.getHour() > close.hours && localDateTime.getMinute() > close.minutes;
     }
 
-    private boolean beforeOpeningBell(ZonedDateTime localDateTime)
-    {
+    private boolean beforeOpeningBell(ZonedDateTime localDateTime) {
         return localDateTime.getHour() < close.hours && localDateTime.getMinute() < close.minutes;
     }
 
-    public void setRanking(String symbol, Rank rank)
-    {
+    public void setRanking(String symbol, Rank rank) {
         symbolRankMap.put(symbol, rank);
     }
 
-    public enum Type
-    {LIT, DARK}
+    public enum Type {LIT, DARK}
 
     @AllArgsConstructor
     @Data
-    public static class Bell
-    {
+    public static class Bell {
         private int hours;
         private int minutes;
     }

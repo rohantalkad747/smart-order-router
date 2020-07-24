@@ -20,8 +20,7 @@ import java.util.Set;
 @Builder
 @NoArgsConstructor
 @AllArgsConstructor
-public class RoutingConfig
-{
+public class RoutingConfig {
     private Generation generation;
     private Set<Country> countrySet;
     private List<Venue> excludedVenues;
@@ -30,10 +29,8 @@ public class RoutingConfig
     private Currency baseCurrency;
     private Map<Currency, Double> availableCapital;
 
-    public Currency getBaseCurrency()
-    {
-        if ( baseCurrency == null )
-        {
+    public Currency getBaseCurrency() {
+        if (baseCurrency == null) {
             baseCurrency = availableCapital
                     .entrySet()
                     .stream()

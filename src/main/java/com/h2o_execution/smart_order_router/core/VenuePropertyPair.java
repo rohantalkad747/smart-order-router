@@ -6,8 +6,7 @@ import lombok.Data;
 
 @Data
 @AllArgsConstructor
-public class VenuePropertyPair<T>
-{
+public class VenuePropertyPair<T> {
     T val;
     Venue venue;
 }

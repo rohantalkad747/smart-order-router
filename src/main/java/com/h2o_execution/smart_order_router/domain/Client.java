@@ -11,15 +11,13 @@ import java.util.Map;
 @Builder
 @NoArgsConstructor
 @AllArgsConstructor
-public class Client
-{
+public class Client {
     private String id;
     private Type type;
     private Inbox inbox;
     private Map<Currency, Double> balances;
 
-    public enum Type
-    {
+    public enum Type {
         TRADING_DESK,
         MARKET_MAKER,
         PROP_TRADER,

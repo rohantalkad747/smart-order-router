@@ -9,8 +9,7 @@ import lombok.NoArgsConstructor;
 @Builder
 @NoArgsConstructor
 @AllArgsConstructor
-public class Order implements Cloneable
-{
+public class Order implements Cloneable {
     private Venue venue;
     private String symbol;
     private String clientOrderId;
@@ -22,18 +21,15 @@ public class Order implements Cloneable
     private volatile double limitPrice;
     private OrderType orderType;
 
-    public synchronized void updateCumulativeQuantity(int newQuantity)
-    {
+    public synchronized void updateCumulativeQuantity(int newQuantity) {
         cumulativeQuantity += newQuantity;
     }
 
-    public int getLeaves()
-    {
+    public int getLeaves() {
         return quantity - cumulativeQuantity;
     }
 
-    public boolean isTerminal()
-    {
+    public boolean isTerminal() {
         return getLeaves() == 0;
     }
 }

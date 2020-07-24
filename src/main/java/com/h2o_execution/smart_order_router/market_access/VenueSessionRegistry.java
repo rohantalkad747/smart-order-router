@@ -10,8 +10,7 @@ import java.util.List;
  *
  * @author Rohan
  */
-public interface VenueSessionRegistry
-{
+public interface VenueSessionRegistry {
     SessionID getSession(Venue venue);
 
     void onConnect(SessionID sessionID);

@@ -1,7 +1,6 @@
 package com.h2o_execution.smart_order_router.domain;
 
-public enum Name
-{
+public enum Name {
     NYSE,
     NASDAQ,
     TSX,

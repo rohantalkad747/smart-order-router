@@ -16,8 +16,7 @@ import java.util.Map;
 
 @Slf4j
 @AllArgsConstructor
-public class FIXMessageMediator
-{
+public class FIXMessageMediator {
     private final FIXGateway gateway;
     private final VenueSessionRegistry venueSessionRegistry;
     private final Map<String, OrderEventsListener> orderEventsListenerMap = new HashMap<>();
@@ -29,47 +28,36 @@ public class FIXMessageMediator
 //    private IndexedChronicle idxChr;
 
 
-    public void fireConnectEvent(SessionID sessionID)
-    {
+    public void fireConnectEvent(SessionID sessionID) {
         venueSessionRegistry.onConnect(sessionID);
     }
 
-    public void fireDisconnectEvent(SessionID sessionID)
-    {
+    public void fireDisconnectEvent(SessionID sessionID) {
         venueSessionRegistry.onDisconnect(sessionID);
     }
 
-    public void fireNewOrderEvent(Venue venue, NewOrderSingle order, OrderEventsListener orderEventsListener) throws Exception
-    {
+    public void fireNewOrderEvent(Venue venue, NewOrderSingle order, OrderEventsListener orderEventsListener) throws Exception {
         SessionID session = venueSessionRegistry.getSession(venue);
         gateway.sendMessage(session, order);
         orderEventsListenerMap.put(order.getClOrdID().getValue(), orderEventsListener);
     }
 
-    public void fireReceiveExecutionReport(ExecutionReport executionReport)
-    {
-        try
-        {
+    public void fireReceiveExecutionReport(ExecutionReport executionReport) {
+        try {
             String clOrdId = executionReport.getClOrdID().getValue();
             int amount = (int) executionReport.getLastShares().getValue();
             orderEventsListenerMap.get(clOrdId).onExecution(clOrdId, amount);
-        }
-        catch (FieldNotFound fieldNotFound)
-        {
+        } catch (FieldNotFound fieldNotFound) {
             log.error("Exception thrown during execution report event", fieldNotFound);
         }
     }
 
-    public void fireRejectionEvent(Reject reject)
-    {
-        try
-        {
+    public void fireRejectionEvent(Reject reject) {
+        try {
             String clorid = reject.getString(ClOrdID.FIELD);
             orderEventsListenerMap.get(clorid).onReject(clorid);
 
-        }
-        catch (FieldNotFound fieldNotFound)
-        {
+        } catch (FieldNotFound fieldNotFound) {
             log.error("Exception thrown during rejection event", fieldNotFound);
         }
     }

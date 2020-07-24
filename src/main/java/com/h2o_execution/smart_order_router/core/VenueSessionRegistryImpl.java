@@ -9,32 +9,27 @@ import quickfix.SessionID;
 import java.util.List;
 import java.util.Map;
 
-public class VenueSessionRegistryImpl implements VenueSessionRegistry
-{
+public class VenueSessionRegistryImpl implements VenueSessionRegistry {
 
     private FIXGateway fixGateway;
     private Map<Venue, Session> sessionMap;
 
     @Override
-    public SessionID getSession(Venue venue)
-    {
+    public SessionID getSession(Venue venue) {
         return null;
     }
 
     @Override
-    public void onConnect(SessionID sessionID)
-    {
+    public void onConnect(SessionID sessionID) {
     }
 
     @Override
-    public void createSessions(List<Venue> venues)
-    {
+    public void createSessions(List<Venue> venues) {
 
     }
 
     @Override
-    public void onDisconnect(SessionID sessionID)
-    {
+    public void onDisconnect(SessionID sessionID) {
 
     }
 }

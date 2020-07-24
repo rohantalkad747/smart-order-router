@@ -1,19 +1,16 @@
 package com.h2o_execution.smart_order_router.domain;
 
-public enum TimeInForce
-{
+public enum TimeInForce {
     DAY('0'),
     IOC('3');
 
     private final char data;
 
-    TimeInForce(char data)
-    {
+    TimeInForce(char data) {
         this.data = data;
     }
 
-    public char getValue()
-    {
+    public char getValue() {
         return data;
     }
 }
