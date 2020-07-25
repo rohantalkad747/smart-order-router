@@ -1,5 +1,6 @@
 package com.h2o_execution.smart_order_router.core;
 
+import com.google.common.collect.Maps;
 import com.h2o_execution.smart_order_router.domain.Currency;
 import com.h2o_execution.smart_order_router.domain.Order;
 import com.h2o_execution.smart_order_router.domain.Side;
@@ -13,7 +14,6 @@ import org.springframework.stereotype.Service;
 
 import java.util.*;
 import java.util.Map.Entry;
-import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ExecutionException;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
@@ -30,41 +30,32 @@ public class ConsolidatedOrderBookImpl implements ConsolidatedOrderBook {
 
     public ConsolidatedOrderBookImpl(FXRatesService fxRatesService) {
         this.fxRatesService = fxRatesService;
-        this.orderBookMap = new ConcurrentHashMap<>();
-        this.orderMap = new HashMap<>();
+        this.orderBookMap = Maps.newConcurrentMap();
+        this.orderMap = Maps.newHashMap();
     }
 
     private Map<Double, Map<Venue, VolumeClaimPair>> getOrderBook(String symbol, Currency currency, Side clientSide) {
-        return orderBookMap
-                .computeIfAbsent(symbol, k -> new EnumMap<>(Currency.class))
-                .computeIfAbsent(currency, k -> Arrays.asList(new HashMap[]{new HashMap<>(), new HashMap<>()}))
+        return (Map<Double, Map<Venue, VolumeClaimPair>>) orderBookMap
+                .computeIfAbsent(symbol, k -> Maps.newEnumMap(Currency.class))
+                .computeIfAbsent(currency, k -> Arrays.asList(Maps.newHashMap(), Maps.newHashMap()))
                 .get(sideIndex(clientSide));
     }
 
     private Map<Venue, VolumeClaimPair> getVenueClaimPairMap(String symbol, Side clientSide, double price, Currency currency) {
         Map<Double, Map<Venue, VolumeClaimPair>> ob = getOrderBook(symbol, currency, clientSide);
-        return ob.computeIfAbsent(price, k -> new HashMap<>());
+        return ob.computeIfAbsent(price, k -> Maps.newHashMap());
     }
 
     @Override
     public Map<Venue, Integer> claimLiquidity(LiquidityQuery q) {
-        Map<Venue, Integer> allotted = new HashMap<>();
+        Map<Venue, Integer> allotted = Maps.newHashMap();
         List<Entry<Double, Map<Venue, VolumeClaimPair>>> withinLimit = getCompatiblePricePoints(q);
         int orderQuantity = q.getQuantity(), currentClaimed = 0;
         for (Entry<Double, Map<Venue, VolumeClaimPair>> pricePoint : withinLimit) {
-            for (Entry<Venue, VolumeClaimPair> volumeVenueClaimPair : pricePoint.getValue().entrySet()) {
-                Venue venue = volumeVenueClaimPair.getKey();
-                if (venue.isAvailable()) {
-                    int leftToClaim = orderQuantity - currentClaimed;
-                    VolumeClaimPair vcp = volumeVenueClaimPair.getValue();
-                    final int finalCurrentClaimed = vcp.claim(leftToClaim);
-                    currentClaimed += finalCurrentClaimed;
-                    allotted.merge(volumeVenueClaimPair.getKey(), 0, (k, v) -> finalCurrentClaimed + v);
-                    if (currentClaimed == orderQuantity) {
-                        return allotted;
-                    }
-                }
-            }
+            VvpAlloc vvpAlloc = VvpAlloc.of(allotted, orderQuantity, currentClaimed, pricePoint);
+            if (vvpAlloc.isAlloc())
+                return allotted;
+            currentClaimed = vvpAlloc.getCurrentClaimed();
         }
         throw new RuntimeException("No allotted liquidity!");
     }
@@ -82,12 +73,12 @@ public class ConsolidatedOrderBookImpl implements ConsolidatedOrderBook {
     }
 
     private Stream<? extends AbstractMap.SimpleEntry<Double, Map<Venue, VolumeClaimPair>>> toFXAdjustedPp(LiquidityQuery q, Entry<Currency, List<Map<Double, Map<Venue, VolumeClaimPair>>>> x) {
-        Map<Double, Map<Venue, VolumeClaimPair>> ppToVenues = x.getValue().get(sideIndex(q.getSide()));
         try {
-
             Double fxRate = fxRatesService.getFXRate(x.getKey(), q.getBaseCurrency());
             return
-                    ppToVenues
+                    x
+                            .getValue()
+                            .get(sideIndex(q.getSide()))
                             .entrySet()
                             .stream()
                             .map(venueVolumeClaimPairMap -> new AbstractMap.SimpleEntry<>(venueVolumeClaimPairMap.getKey() * fxRate, venueVolumeClaimPairMap.getValue()));
@@ -184,6 +175,58 @@ public class ConsolidatedOrderBookImpl implements ConsolidatedOrderBook {
 
         public synchronized void incVol(int amount) {
             totalVolume += amount;
+        }
+    }
+
+    private static class VvpAlloc {
+        private boolean isAlloc;
+        private Map<Venue, Integer> allotted;
+        private int orderQuantity;
+        private int currentClaimed;
+        private Entry<Double, Map<Venue, VolumeClaimPair>> pricePoint;
+
+        public VvpAlloc(Map<Venue, Integer> allotted, int orderQuantity, int currentClaimed, Entry<Double, Map<Venue, VolumeClaimPair>> pricePoint) {
+            this.allotted = allotted;
+            this.orderQuantity = orderQuantity;
+            this.currentClaimed = currentClaimed;
+            this.pricePoint = pricePoint;
+        }
+
+        public static VvpAlloc of(Map<Venue, Integer> allotted, int orderQuantity, int currentClaimed, Entry<Double, Map<Venue, VolumeClaimPair>> pricePoint) {
+            VvpAlloc vvpAlloc = new VvpAlloc(allotted, orderQuantity, currentClaimed, pricePoint);
+            vvpAlloc.alloc();
+            return vvpAlloc;
+        }
+
+        boolean isAlloc() {
+            return isAlloc;
+        }
+
+        public int getCurrentClaimed() {
+            return currentClaimed;
+        }
+
+        public VvpAlloc alloc() {
+            for (Entry<Venue, VolumeClaimPair> volumeVenueClaimPair : pricePoint.getValue().entrySet()) {
+                Venue venue = volumeVenueClaimPair.getKey();
+                if (venue.isAvailable()) {
+                    tryAlloc(volumeVenueClaimPair);
+                    if (currentClaimed == orderQuantity) {
+                        isAlloc = true;
+                        return this;
+                    }
+                }
+            }
+            isAlloc = false;
+            return this;
+        }
+
+        private void tryAlloc(Entry<Venue, VolumeClaimPair> volumeVenueClaimPair) {
+            int leftToClaim = orderQuantity - currentClaimed;
+            VolumeClaimPair vcp = volumeVenueClaimPair.getValue();
+            final int finalCurrentClaimed = vcp.claim(leftToClaim);
+            currentClaimed += finalCurrentClaimed;
+            allotted.merge(volumeVenueClaimPair.getKey(), 0, (k, v) -> finalCurrentClaimed + v);
         }
     }
 }
