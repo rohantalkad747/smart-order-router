@@ -1,4 +1,4 @@
-# Parallel, Cross-Border SOR
+# Smart Order Router
 
 #### Description
 
