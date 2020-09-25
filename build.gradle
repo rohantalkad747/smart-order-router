@@ -2,7 +2,12 @@ plugins {
 	id 'org.springframework.boot' version '2.3.0.RELEASE'
 	id 'io.spring.dependency-management' version '1.0.9.RELEASE'
 	id 'java'
+	id "org.checkerframework" version "0.5.10"
+
 }
+
+apply plugin: 'org.checkerframework'
+
 
 group = 'com.h2_execution'
 version = '0.0.1-SNAPSHOT'
@@ -43,6 +48,9 @@ dependencies {
 
 	// https://mvnrepository.com/artifact/net.openhft/chronicle-queue
 	compile group: 'net.openhft', name: 'chronicle-queue', version: '5.19.32'
+
+	// https://mvnrepository.com/artifact/org.hamcrest/hamcrest-all
+	testCompile group: 'org.hamcrest', name: 'hamcrest-all', version: '1.3'
 
 
 

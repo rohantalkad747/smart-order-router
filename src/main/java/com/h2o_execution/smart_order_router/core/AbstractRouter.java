@@ -5,15 +5,22 @@ import com.h2o_execution.smart_order_router.domain.TimeInForce;
 import com.h2o_execution.smart_order_router.domain.Venue;
 import com.h2o_execution.smart_order_router.market_access.OrderManager;
 import lombok.AllArgsConstructor;
+import lombok.Data;
+import lombok.ToString;
 import lombok.extern.slf4j.Slf4j;
 
+import java.math.BigDecimal;
+import java.math.RoundingMode;
+import java.util.AbstractMap;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Map.Entry;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicInteger;
+import java.util.stream.Collectors;
 
+@Data
 @Slf4j
 @AllArgsConstructor
 public abstract class AbstractRouter implements Router {
@@ -25,6 +32,10 @@ public abstract class AbstractRouter implements Router {
     private final AtomicInteger totalRouted;
     private final Map<String, Order> idOrderMap;
     protected Map<Venue, Integer> routes;
+
+    public int getTotalRouted() {
+        return totalRouted.get();
+    }
 
     public AbstractRouter(OrderIdService orderIdService, OrderManager orderManager, ProbabilisticExecutionVenueProvider probabilisticExecutionVenueProvider, ConsolidatedOrderBook consolidatedOrderBook, RoutingConfig routingConfig) {
         this.orderIdService = orderIdService;
@@ -38,6 +49,14 @@ public abstract class AbstractRouter implements Router {
     }
 
     protected abstract void onDoneCreatingChildOrders();
+
+    private void logRouteState(Order order) {
+        log.debug(String.format("Routed %d/%d shares", totalRouted.get(), order.getQuantity()));
+        log.debug("Routing table: \n " + routes.entrySet()
+                .stream()
+                .map(kv -> new AbstractMap.SimpleEntry(kv.getKey().getName(), kv.getValue()))
+                .collect(Collectors.toList()));
+    }
 
     protected abstract void onNewChildOrder(VenuePropertyPair<Order> order);
 
@@ -76,11 +95,22 @@ public abstract class AbstractRouter implements Router {
             throw new RuntimeException("Cannot route a terminal order!");
         }
         createSweepChildOrders(order, routingConfig);
-        onDoneCreatingChildOrders();
+        routeStageComplete(order);
         if (orderStillMarketable(order)) {
+            log.debug("Starting to post orders to venues ...");
             createPostChildOrders(order, routingConfig);
-            onDoneCreatingChildOrders();
+            routeStageComplete(order);
         }
+        log.debug("Done routing all shares!");
+    }
+
+    private boolean orderStillMarketable(Order order) {
+        return totalRouted.get() != order.getQuantity();
+    }
+
+    private void routeStageComplete(Order order) {
+        logRouteState(order);
+        onDoneCreatingChildOrders();
     }
 
     private void createPostChildOrders(Order order, RoutingConfig routingConfig) {
@@ -88,7 +118,7 @@ public abstract class AbstractRouter implements Router {
         routes = new HashMap<>();
         for (VenuePropertyPair<Double> venueExecutionPair : venueExecutionProbabilityPairs) {
             double executionProbability = venueExecutionPair.getVal();
-            int childQuantity = (int) (order.getLeaves() * executionProbability);
+            int childQuantity = (int) Math.round(order.getLeaves() * executionProbability);
             routes.put(venueExecutionPair.getVenue(), childQuantity);
         }
         sliceIntoChildren(order, TimeInForce.DAY);
@@ -98,7 +128,7 @@ public abstract class AbstractRouter implements Router {
         ConsolidatedOrderBookImpl.LiquidityQuery query = ConsolidatedOrderBookImpl.LiquidityQuery.builder()
                 .type(routingConfig.getSweepType())
                 .countries(routingConfig.getCountrySet())
-                .limitPx(order.getLimitPrice())
+                .limitPx(new BigDecimal(order.getLimitPrice()).setScale(2, RoundingMode.HALF_UP))
                 .symbol(order.getSymbol())
                 .baseCurrency(routingConfig.getBaseCurrency())
                 .currencies(routingConfig.getAvailableCapital().keySet())
@@ -107,10 +137,6 @@ public abstract class AbstractRouter implements Router {
                 .build();
         routes = consolidatedOrderBook.claimLiquidity(query);
         sliceIntoChildren(order, TimeInForce.IOC);
-    }
-
-    private boolean orderStillMarketable(Order order) {
-        return totalRouted.get() != order.getQuantity();
     }
 
     @Override

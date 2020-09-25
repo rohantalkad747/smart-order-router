@@ -2,6 +2,7 @@ package com.h2o_execution.smart_order_router.core;
 
 import com.h2o_execution.smart_order_router.domain.Order;
 import com.h2o_execution.smart_order_router.market_access.OrderManager;
+import lombok.ToString;
 import lombok.extern.slf4j.Slf4j;
 
 @Slf4j

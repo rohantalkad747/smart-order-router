@@ -5,6 +5,7 @@ import com.h2o_execution.smart_order_router.domain.Order;
 import com.h2o_execution.smart_order_router.domain.Venue;
 import com.h2o_execution.smart_order_router.market_access.OrderManager;
 import lombok.Builder;
+import lombok.ToString;
 import lombok.extern.slf4j.Slf4j;
 import org.jetbrains.annotations.NotNull;
 
@@ -64,12 +65,12 @@ public class ParallelRouter extends AbstractRouter {
         for (VenuePropertyPair<Order> vpp : toRoute) {
             scheduleRouteTask(max, countDownLatch, scheduledExecutorService, vpp);
         }
+        countDownLatch.await();
     }
 
     private void scheduleRouteTask(int max, CountDownLatch countDownLatch, ScheduledExecutorService scheduledExecutorService, VenuePropertyPair<Order> vpp) throws InterruptedException {
         int latencyAdjustment = getLatencyAdjustment(max, vpp);
         doSchedule(countDownLatch, scheduledExecutorService, vpp, latencyAdjustment);
-        countDownLatch.await();
     }
 
     private void doSchedule(CountDownLatch countDownLatch, ScheduledExecutorService scheduledExecutorService, VenuePropertyPair<Order> vpp, int latencyAdjustment) {

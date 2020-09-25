@@ -11,7 +11,7 @@ import quickfix.fix42.Reject;
 
 @Slf4j
 public class FIXGateway extends MessageCracker implements Application {
-    private static final String CONFIG = "C:/Users/Rohan/git/smart_order_router/src/main/resources/gatewayserver.properties";
+    private static final String CONFIG = "C:/Users/Rohan/git/smart-order-router/src/main/resources/gatewayserver.properties";
     @Setter
     private FIXMessageMediator fixMessageMediator;
 

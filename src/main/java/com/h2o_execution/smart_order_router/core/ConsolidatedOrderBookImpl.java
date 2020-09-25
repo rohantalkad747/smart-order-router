@@ -1,5 +1,6 @@
 package com.h2o_execution.smart_order_router.core;
 
+import com.google.common.collect.Lists;
 import com.google.common.collect.Maps;
 import com.h2o_execution.smart_order_router.domain.Currency;
 import com.h2o_execution.smart_order_router.domain.Order;
@@ -10,11 +11,17 @@ import lombok.Builder;
 import lombok.Data;
 import lombok.ToString;
 import lombok.extern.slf4j.Slf4j;
+import org.jetbrains.annotations.NotNull;
 import org.springframework.stereotype.Service;
 
+import java.io.StreamTokenizer;
+import java.math.BigDecimal;
+import java.math.RoundingMode;
 import java.util.*;
 import java.util.Map.Entry;
 import java.util.concurrent.ExecutionException;
+import java.util.function.Function;
+import java.util.function.Predicate;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
@@ -24,7 +31,7 @@ import java.util.stream.Stream;
 public class ConsolidatedOrderBookImpl implements ConsolidatedOrderBook {
     private static final int BUY = 0;
     private static final int SELL = 1;
-    private final Map<String, Map<Currency, List<Map<Double, Map<Venue, VolumeClaimPair>>>>> orderBookMap;
+    private final Map<String, Map<Currency, List<Map<BigDecimal, Map<Venue, VolumeClaimPair>>>>> orderBookMap;
     private final Map<String, Order> orderMap;
     private final FXRatesService fxRatesService;
 
@@ -34,64 +41,110 @@ public class ConsolidatedOrderBookImpl implements ConsolidatedOrderBook {
         this.orderMap = Maps.newHashMap();
     }
 
-    private Map<Double, Map<Venue, VolumeClaimPair>> getOrderBook(String symbol, Currency currency, Side clientSide) {
-        return (Map<Double, Map<Venue, VolumeClaimPair>>) orderBookMap
+    private Map<BigDecimal, Map<Venue, VolumeClaimPair>> getOrderBook(String symbol, Currency currency, Side clientSide) {
+        return orderBookMap
                 .computeIfAbsent(symbol, k -> Maps.newEnumMap(Currency.class))
                 .computeIfAbsent(currency, k -> Arrays.asList(Maps.newHashMap(), Maps.newHashMap()))
-                .get(sideIndex(clientSide));
+                .get(clientSide.ordinal());
     }
 
-    private Map<Venue, VolumeClaimPair> getVenueClaimPairMap(String symbol, Side clientSide, double price, Currency currency) {
-        Map<Double, Map<Venue, VolumeClaimPair>> ob = getOrderBook(symbol, currency, clientSide);
+    private Map<Venue, VolumeClaimPair> getVenueClaimPairMap(String symbol, Side clientSide, BigDecimal price, Currency currency) {
+        Map<BigDecimal, Map<Venue, VolumeClaimPair>> ob = getOrderBook(symbol, currency, clientSide);
         return ob.computeIfAbsent(price, k -> Maps.newHashMap());
+
     }
 
     @Override
     public Map<Venue, Integer> claimLiquidity(LiquidityQuery q) {
         Map<Venue, Integer> allotted = Maps.newHashMap();
-        List<Entry<Double, Map<Venue, VolumeClaimPair>>> withinLimit = getCompatiblePricePoints(q);
-        int orderQuantity = q.getQuantity(), currentClaimed = 0;
-        for (Entry<Double, Map<Venue, VolumeClaimPair>> pricePoint : withinLimit) {
-            VvpAlloc vvpAlloc = VvpAlloc.of(allotted, orderQuantity, currentClaimed, pricePoint);
-            if (vvpAlloc.isAlloc())
-                return allotted;
-            currentClaimed = vvpAlloc.getCurrentClaimed();
+        List<Entry<BigDecimal, Map<Venue, VolumeClaimPair>>> withinLimit = getCompatiblePricePoints(q);
+        if (withinLimit != null) {
+            int orderQuantity = q.getQuantity(), currentClaimed = 0;
+            for (Entry<BigDecimal, Map<Venue, VolumeClaimPair>> pricePoint : withinLimit) {
+                VvpAlloc vvpAlloc = VvpAlloc.of(allotted, orderQuantity, currentClaimed, pricePoint);
+                if (vvpAlloc.isAlloc()) {
+                    return allotted;
+                }
+                currentClaimed = vvpAlloc.getCurrentClaimed();
+            }
         }
-        throw new RuntimeException("No allotted liquidity!");
+        return allotted;
     }
 
-    private List<Entry<Double, Map<Venue, VolumeClaimPair>>> getCompatiblePricePoints(LiquidityQuery q) {
-        return orderBookMap
-                .get(q.getSymbol())
+    private List<Entry<BigDecimal, Map<Venue, VolumeClaimPair>>> getCompatiblePricePoints(LiquidityQuery q) {
+        Map<Currency, List<Map<BigDecimal, Map<Venue, VolumeClaimPair>>>> currencyListMap = orderBookMap.get(q.getSymbol());
+        if (currencyListMap == null) {
+            return null;
+        }
+        return currencyListMap
                 .entrySet()
                 .stream()
-                .filter(x -> q.getCurrencies().contains(x.getKey()))
-                .flatMap(x -> toFXAdjustedPp(q, x))
+                .filter(isCompatibleCurrency(q))
+                .flatMap(toFxAdjustedPp(q))
                 .filter(Objects::nonNull)
-                .filter(x -> q.side == Side.BUY ? x.getKey() <= q.getLimitPx() : x.getKey() >= q.getLimitPx())
+                .filter(tradableSide(q))
+                .sorted(Comparator.comparing(entry -> entry.getKey().doubleValue()))
                 .collect(Collectors.toList());
     }
 
-    private Stream<? extends AbstractMap.SimpleEntry<Double, Map<Venue, VolumeClaimPair>>> toFXAdjustedPp(LiquidityQuery q, Entry<Currency, List<Map<Double, Map<Venue, VolumeClaimPair>>>> x) {
+    @NotNull
+    private Predicate<Entry<BigDecimal, Map<Venue, VolumeClaimPair>>> tradableSide(LiquidityQuery q) {
+        return x -> (q.side == Side.BUY) ?
+                x.getKey().doubleValue() <= q.getLimitPx().doubleValue()
+                :
+                x.getKey().doubleValue() >= q.getLimitPx().doubleValue();
+    }
+
+    @NotNull
+    private Function<Entry<Currency, List<Map<BigDecimal, Map<Venue, VolumeClaimPair>>>>, Stream<? extends Entry<BigDecimal, Map<Venue, VolumeClaimPair>>>> toFxAdjustedPp(LiquidityQuery q) {
+        return x -> toFXAdjustedPp(q, x);
+    }
+
+    @NotNull
+    private Predicate<Entry<Currency, List<Map<BigDecimal, Map<Venue, VolumeClaimPair>>>>> isCompatibleCurrency(LiquidityQuery q) {
+        return x -> q.getCurrencies().contains(x.getKey());
+    }
+
+    private Stream<Entry<BigDecimal, Map<Venue, VolumeClaimPair>>> toFXAdjustedPp(LiquidityQuery q, Entry<Currency, List<Map<BigDecimal, Map<Venue, VolumeClaimPair>>>> x) {
         try {
-            Double fxRate = fxRatesService.getFXRate(x.getKey(), q.getBaseCurrency());
-            return
-                    x
-                            .getValue()
-                            .get(sideIndex(q.getSide()))
-                            .entrySet()
-                            .stream()
-                            .map(venueVolumeClaimPairMap -> new AbstractMap.SimpleEntry<>(venueVolumeClaimPairMap.getKey() * fxRate, venueVolumeClaimPairMap.getValue()));
+            Stream<Entry<BigDecimal, Map<Venue, VolumeClaimPair>>> ppStream = getRawPpStream(q, x);
+            if (x.getKey() == q.getBaseCurrency()) {
+                return ppStream;
+            }
+            return convertPpStreamCurrency(q, x, ppStream);
         } catch (ExecutionException e) {
             return null;
         }
     }
 
+    private Stream<Entry<BigDecimal, Map<Venue, VolumeClaimPair>>> convertPpStreamCurrency(LiquidityQuery q, Entry<Currency, List<Map<BigDecimal, Map<Venue, VolumeClaimPair>>>> x, Stream<Entry<BigDecimal, Map<Venue, VolumeClaimPair>>> ppStream) throws ExecutionException {
+        double fxRate = fxRatesService.getFXRate(x.getKey(), q.getBaseCurrency());
+        return ppStream.map(doFxConversion(fxRate));
+    }
+
+    @NotNull
+    private Function<Entry<BigDecimal, Map<Venue, VolumeClaimPair>>, AbstractMap.SimpleEntry<BigDecimal, Map<Venue, VolumeClaimPair>>> doFxConversion(double fxRate) {
+        return venueVolumeClaimPairMap -> new AbstractMap.SimpleEntry<>(getLimitPxTwoDecimalPlaces(venueVolumeClaimPairMap.getKey().doubleValue() * fxRate), venueVolumeClaimPairMap.getValue());
+    }
+
+    private Stream<Entry<BigDecimal, Map<Venue, VolumeClaimPair>>> getRawPpStream(LiquidityQuery q, Entry<Currency, List<Map<BigDecimal, Map<Venue, VolumeClaimPair>>>> x) {
+        return x
+                .getValue()
+                .get(sideIndex(q.getSide()))
+                .entrySet()
+                .stream();
+    }
+
     @Override
     public void addOrder(Order order) {
-        Map<Venue, VolumeClaimPair> venueClaimPairMap = getVenueClaimPairMap(order.getSymbol(), order.getSide(), order.getLimitPrice(), order.getVenue().getCurrency());
+        BigDecimal limitPxTwoDecimalPlaces = getLimitPxTwoDecimalPlaces(order.getLimitPrice());
+        Map<Venue, VolumeClaimPair> venueClaimPairMap = getVenueClaimPairMap(order.getSymbol(), order.getSide(), limitPxTwoDecimalPlaces, order.getVenue().getCurrency());
         venueClaimPairMap.computeIfAbsent(order.getVenue(), k -> new VolumeClaimPair()).incVol(order.getLeaves());
         orderMap.put(order.getClientOrderId(), order);
+    }
+
+    private BigDecimal getLimitPxTwoDecimalPlaces(double px) {
+        return new BigDecimal(px).setScale(2, RoundingMode.HALF_UP);
     }
 
     @Override
@@ -124,10 +177,10 @@ public class ConsolidatedOrderBookImpl implements ConsolidatedOrderBook {
 
     private void incVol(Order old, int diff) {
         orderBookMap
-                .computeIfAbsent(old.getSymbol(), k -> new EnumMap<>(Currency.class))
-                .computeIfAbsent(old.getCurrency(), k -> new ArrayList<>())
+                .computeIfAbsent(old.getSymbol(), k -> Maps.newEnumMap(Currency.class))
+                .computeIfAbsent(old.getCurrency(), k -> Lists.newArrayList())
                 .get(sideIndex(old.getSide()))
-                .computeIfAbsent(old.getLimitPrice(), k -> new HashMap<>())
+                .computeIfAbsent(getLimitPxTwoDecimalPlaces(old.getLimitPrice()), k -> Maps.newHashMap())
                 .get(old.getVenue())
                 .incVol(diff);
     }
@@ -138,7 +191,7 @@ public class ConsolidatedOrderBookImpl implements ConsolidatedOrderBook {
 
     @Override
     public void onReject(String clientOrderId) {
-        // Don't care about rejections since we never send orders from here
+        log.info("Received a rejection for ClorId: " + clientOrderId);
     }
 
     @Data
@@ -148,7 +201,7 @@ public class ConsolidatedOrderBookImpl implements ConsolidatedOrderBook {
         private Venue.Type type;
         private String symbol;
         private int quantity;
-        private double limitPx;
+        private BigDecimal limitPx;
         private Side side;
         private Currency baseCurrency;
         private Set<Currency> currencies;
@@ -179,20 +232,20 @@ public class ConsolidatedOrderBookImpl implements ConsolidatedOrderBook {
     }
 
     private static class VvpAlloc {
-        private boolean isAlloc;
+        private boolean isAlloc = false;
         private Map<Venue, Integer> allotted;
         private int orderQuantity;
         private int currentClaimed;
-        private Entry<Double, Map<Venue, VolumeClaimPair>> pricePoint;
+        private Entry<BigDecimal, Map<Venue, VolumeClaimPair>> pricePoint;
 
-        public VvpAlloc(Map<Venue, Integer> allotted, int orderQuantity, int currentClaimed, Entry<Double, Map<Venue, VolumeClaimPair>> pricePoint) {
+        public VvpAlloc(Map<Venue, Integer> allotted, int orderQuantity, int currentClaimed, Entry<BigDecimal, Map<Venue, VolumeClaimPair>> pricePoint) {
             this.allotted = allotted;
             this.orderQuantity = orderQuantity;
             this.currentClaimed = currentClaimed;
             this.pricePoint = pricePoint;
         }
 
-        public static VvpAlloc of(Map<Venue, Integer> allotted, int orderQuantity, int currentClaimed, Entry<Double, Map<Venue, VolumeClaimPair>> pricePoint) {
+        public static VvpAlloc of(Map<Venue, Integer> allotted, int orderQuantity, int currentClaimed, Entry<BigDecimal, Map<Venue, VolumeClaimPair>> pricePoint) {
             VvpAlloc vvpAlloc = new VvpAlloc(allotted, orderQuantity, currentClaimed, pricePoint);
             vvpAlloc.alloc();
             return vvpAlloc;
@@ -206,19 +259,17 @@ public class ConsolidatedOrderBookImpl implements ConsolidatedOrderBook {
             return currentClaimed;
         }
 
-        public VvpAlloc alloc() {
+        public void alloc() {
             for (Entry<Venue, VolumeClaimPair> volumeVenueClaimPair : pricePoint.getValue().entrySet()) {
                 Venue venue = volumeVenueClaimPair.getKey();
                 if (venue.isAvailable()) {
                     tryAlloc(volumeVenueClaimPair);
                     if (currentClaimed == orderQuantity) {
                         isAlloc = true;
-                        return this;
+                        return;
                     }
                 }
             }
-            isAlloc = false;
-            return this;
         }
 
         private void tryAlloc(Entry<Venue, VolumeClaimPair> volumeVenueClaimPair) {
@@ -226,7 +277,7 @@ public class ConsolidatedOrderBookImpl implements ConsolidatedOrderBook {
             VolumeClaimPair vcp = volumeVenueClaimPair.getValue();
             final int finalCurrentClaimed = vcp.claim(leftToClaim);
             currentClaimed += finalCurrentClaimed;
-            allotted.merge(volumeVenueClaimPair.getKey(), 0, (k, v) -> finalCurrentClaimed + v);
+            allotted.merge(volumeVenueClaimPair.getKey(), finalCurrentClaimed, (k, v) -> finalCurrentClaimed + v);
         }
     }
 }

@@ -6,47 +6,37 @@ import org.springframework.core.io.DefaultResourceLoader;
 import org.springframework.core.io.Resource;
 import org.springframework.core.io.ResourceLoader;
 import org.springframework.stereotype.Service;
-import org.yaml.snakeyaml.Yaml;
 
 import java.io.IOException;
-import java.io.InputStream;
 import java.time.MonthDay;
 import java.util.*;
 
+/**
+ * Responsible for determining whether input dates are holidays for the given country.
+ */
 @Service
 public class HolidayMaster {
-    Resource resourceFile;
 
     @Getter
-    private final Map<MonthDay, Set<Country>> holidays;
+    private final Map<Country, Set<MonthDay>> holidaysByCountry;
 
-    public HolidayMaster() throws IOException {
-        this.holidays = new HashMap<>();
-        parseCountryHolidays();
+    public HolidayMaster(CountryToHolidayMapper countryToHolidayMapper) {
+        holidaysByCountry = countryToHolidayMapper.getMapping().orElseThrow(RuntimeException::new);
     }
 
-    private void parseCountryHolidays() throws IOException {
+    public static HolidayMaster newInstanceFromYamlResource(String path) {
         ResourceLoader resourceLoader = new DefaultResourceLoader();
-        Resource resource = resourceLoader.getResource("classpath:holidays.yaml");
-        InputStream inputStream = resource.getInputStream();
-        Yaml yaml = new Yaml();
-        Map<String, List<String>> holidayYamlData = yaml.load(inputStream);
-        for (Country country : Country.values()) {
-            List<String> countryHolidays = holidayYamlData.get(country.toString());
-            for (String holiday : countryHolidays) {
-                String[] monthDayStr = holiday.split("/");
-                int month = Integer.parseInt(monthDayStr[0]);
-                int day = Integer.parseInt(monthDayStr[1]);
-                MonthDay md = MonthDay.of(month, day);
-                holidays.computeIfAbsent(md, k -> new HashSet<>()).add(country);
-            }
-        }
+        Resource resource = resourceLoader.getResource(path);
+        CountryToHolidayYAMLMapper countryToHolidayYAMLMapper = new CountryToHolidayYAMLMapper(resource);
+        return new HolidayMaster(countryToHolidayYAMLMapper);
     }
 
-    public boolean isHoliday(Venue venue) {
-        MonthDay monthDay = MonthDay.now();
-        Set<Country> countries = holidays.get(monthDay);
+    /**
+     * @return true if {@code monthDayToTest} is a holiday in the country of the given {@code venue}.
+     */
+    public boolean isHoliday(MonthDay monthDayToTest, Venue venue) {
         Country country = venue.getCountry();
-        return countries != null && countries.contains(country);
+        Set<MonthDay> holidays = holidaysByCountry.get(country);
+        return holidays.contains(monthDayToTest);
     }
 }
