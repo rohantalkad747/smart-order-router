@@ -2,7 +2,6 @@ package com.h2o_execution.smart_order_router.core;
 
 import lombok.AllArgsConstructor;
 import lombok.Data;
-import lombok.NoArgsConstructor;
 
 @Data
 @AllArgsConstructor

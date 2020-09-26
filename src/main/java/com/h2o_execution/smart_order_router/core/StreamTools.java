@@ -1,7 +1,5 @@
 package com.h2o_execution.smart_order_router.core;
 
-import com.google.common.collect.Lists;
-
 import java.util.Iterator;
 import java.util.List;
 import java.util.stream.Collectors;

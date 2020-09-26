@@ -10,7 +10,10 @@ import org.yaml.snakeyaml.Yaml;
 import java.io.IOException;
 import java.io.InputStream;
 import java.time.MonthDay;
-import java.util.*;
+import java.util.List;
+import java.util.Map;
+import java.util.Optional;
+import java.util.Set;
 
 public class CountryToHolidayYAMLMapper implements CountryToHolidayMapper {
     private final Resource resc;

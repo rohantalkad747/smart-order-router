@@ -6,6 +6,9 @@ import java.util.List;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
+import static org.hamcrest.CoreMatchers.is;
+import static org.hamcrest.MatcherAssert.assertThat;
+import static org.hamcrest.Matchers.equalTo;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
@@ -63,5 +66,8 @@ class StreamToolsTest {
         Stream<Integer> dupTwo = duplicated.getSecond();
 
         List<Integer> dupOneList = dupOne.collect(Collectors.toList());
+        List<Integer> dupTwoList = dupTwo.collect(Collectors.toList());
+
+        assertThat(dupOneList, is(equalTo(dupTwoList)));
     }
 }

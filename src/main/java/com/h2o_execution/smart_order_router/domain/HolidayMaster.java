@@ -7,9 +7,9 @@ import org.springframework.core.io.Resource;
 import org.springframework.core.io.ResourceLoader;
 import org.springframework.stereotype.Service;
 
-import java.io.IOException;
 import java.time.MonthDay;
-import java.util.*;
+import java.util.Map;
+import java.util.Set;
 
 /**
  * Responsible for determining whether input dates are holidays for the given country.

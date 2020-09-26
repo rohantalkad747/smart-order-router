@@ -4,13 +4,14 @@ import com.google.common.collect.Lists;
 import com.h2o_execution.smart_order_router.domain.Order;
 import com.h2o_execution.smart_order_router.domain.Venue;
 import com.h2o_execution.smart_order_router.market_access.OrderManager;
-import lombok.Builder;
-import lombok.ToString;
 import lombok.extern.slf4j.Slf4j;
 import org.jetbrains.annotations.NotNull;
 
 import java.util.List;
-import java.util.concurrent.*;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.Executors;
+import java.util.concurrent.ScheduledExecutorService;
+import java.util.concurrent.TimeUnit;
 
 /**
  * This is a parallel smart order implementation that makes dispatch time adjustments in an effort
@@ -81,9 +82,9 @@ public class ParallelRouter extends AbstractRouter {
     @NotNull
     private Runnable createRouteTask(CountDownLatch countDownLatch, VenuePropertyPair<Order> vpp) {
         return () -> {
-                orderManager.sendOrder(vpp.getVenue(), vpp.getVal(), this);
-                countDownLatch.countDown();
-            };
+            orderManager.sendOrder(vpp.getVenue(), vpp.getVal(), this);
+            countDownLatch.countDown();
+        };
     }
 
     private int getLatencyAdjustment(int max, VenuePropertyPair<Order> vpp) {

@@ -33,15 +33,15 @@ class CountryToHolidayMapperTest {
 
         maybeCountryToHolidayMapping.ifPresentOrElse(countryToHolidayMapping -> {
 
-            // When
-            Set<MonthDay> canadianHolidays = countryToHolidayMapping.get(Country.CAN);
+                    // When
+                    Set<MonthDay> canadianHolidays = countryToHolidayMapping.get(Country.CAN);
 
-            // Then
-            MonthDay christmas = MonthDay.of(12, 25);
-            MonthDay thanksgiving = MonthDay.of(10, 12);
-            assertThat(canadianHolidays, containsInAnyOrder(christmas, thanksgiving));
-            },
+                    // Then
+                    MonthDay christmas = MonthDay.of(12, 25);
+                    MonthDay thanksgiving = MonthDay.of(10, 12);
+                    assertThat(canadianHolidays, containsInAnyOrder(christmas, thanksgiving));
+                },
 
-        RuntimeException::new);
+                RuntimeException::new);
     }
 }

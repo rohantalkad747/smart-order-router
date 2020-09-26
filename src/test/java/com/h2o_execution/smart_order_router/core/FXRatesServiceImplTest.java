@@ -12,24 +12,19 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 
 @Slf4j
 @SpringBootTest
-class FXRatesServiceImplTest
-{
+class FXRatesServiceImplTest {
 
     @Test
-    void getRealTimeFXRate() throws ExecutionException
-    {
+    void getRealTimeFXRate() throws ExecutionException {
 
         FXRatesService fxRatesService = new FXRatesServiceImpl(new RestTemplate());
 
         Currency[] currencies = Currency.values();
-        for (Currency c1 : currencies)
-        {
-            for (Currency c2 : currencies)
-            {
+        for (Currency c1 : currencies) {
+            for (Currency c2 : currencies) {
                 double fxRate = fxRatesService.getFXRate(c1, c2);
                 log.info("FX Rate " + c1 + c2 + ": " + fxRate);
-                if (c1 == c2)
-                {
+                if (c1 == c2) {
                     assertEquals(1, fxRate, 0.1);
                 }
             }

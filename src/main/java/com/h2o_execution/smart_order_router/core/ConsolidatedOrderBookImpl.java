@@ -14,7 +14,6 @@ import lombok.extern.slf4j.Slf4j;
 import org.jetbrains.annotations.NotNull;
 import org.springframework.stereotype.Service;
 
-import java.io.StreamTokenizer;
 import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.util.*;
@@ -81,6 +80,7 @@ public class ConsolidatedOrderBookImpl implements ConsolidatedOrderBook {
                 .stream()
                 .filter(isCompatibleCurrency(q))
                 .flatMap(toFxAdjustedPp(q))
+                .peek(System.out::println)
                 .filter(Objects::nonNull)
                 .filter(tradableSide(q))
                 .sorted(Comparator.comparing(entry -> entry.getKey().doubleValue()))
@@ -108,6 +108,7 @@ public class ConsolidatedOrderBookImpl implements ConsolidatedOrderBook {
     private Stream<Entry<BigDecimal, Map<Venue, VolumeClaimPair>>> toFXAdjustedPp(LiquidityQuery q, Entry<Currency, List<Map<BigDecimal, Map<Venue, VolumeClaimPair>>>> x) {
         try {
             Stream<Entry<BigDecimal, Map<Venue, VolumeClaimPair>>> ppStream = getRawPpStream(q, x);
+            log.info("Currencies " + x.getKey() + "," + q.getBaseCurrency());
             if (x.getKey() == q.getBaseCurrency()) {
                 return ppStream;
             }
@@ -119,6 +120,7 @@ public class ConsolidatedOrderBookImpl implements ConsolidatedOrderBook {
 
     private Stream<Entry<BigDecimal, Map<Venue, VolumeClaimPair>>> convertPpStreamCurrency(LiquidityQuery q, Entry<Currency, List<Map<BigDecimal, Map<Venue, VolumeClaimPair>>>> x, Stream<Entry<BigDecimal, Map<Venue, VolumeClaimPair>>> ppStream) throws ExecutionException {
         double fxRate = fxRatesService.getFXRate(x.getKey(), q.getBaseCurrency());
+        log.debug("Converting at rate " + fxRate);
         return ppStream.map(doFxConversion(fxRate));
     }
 
@@ -233,10 +235,10 @@ public class ConsolidatedOrderBookImpl implements ConsolidatedOrderBook {
 
     private static class VvpAlloc {
         private boolean isAlloc = false;
-        private Map<Venue, Integer> allotted;
-        private int orderQuantity;
+        private final Map<Venue, Integer> allotted;
+        private final int orderQuantity;
         private int currentClaimed;
-        private Entry<BigDecimal, Map<Venue, VolumeClaimPair>> pricePoint;
+        private final Entry<BigDecimal, Map<Venue, VolumeClaimPair>> pricePoint;
 
         public VvpAlloc(Map<Venue, Integer> allotted, int orderQuantity, int currentClaimed, Entry<BigDecimal, Map<Venue, VolumeClaimPair>> pricePoint) {
             this.allotted = allotted;

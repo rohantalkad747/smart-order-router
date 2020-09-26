@@ -6,7 +6,6 @@ import com.h2o_execution.smart_order_router.domain.Venue;
 import com.h2o_execution.smart_order_router.market_access.OrderManager;
 import lombok.AllArgsConstructor;
 import lombok.Data;
-import lombok.ToString;
 import lombok.extern.slf4j.Slf4j;
 
 import java.math.BigDecimal;
@@ -33,10 +32,6 @@ public abstract class AbstractRouter implements Router {
     private final Map<String, Order> idOrderMap;
     protected Map<Venue, Integer> routes;
 
-    public int getTotalRouted() {
-        return totalRouted.get();
-    }
-
     public AbstractRouter(OrderIdService orderIdService, OrderManager orderManager, ProbabilisticExecutionVenueProvider probabilisticExecutionVenueProvider, ConsolidatedOrderBook consolidatedOrderBook, RoutingConfig routingConfig) {
         this.orderIdService = orderIdService;
         this.orderManager = orderManager;
@@ -46,6 +41,10 @@ public abstract class AbstractRouter implements Router {
         this.idOrderMap = new ConcurrentHashMap<>();
         this.totalRouted = new AtomicInteger();
         this.routes = new HashMap<>();
+    }
+
+    public int getTotalRouted() {
+        return totalRouted.get();
     }
 
     protected abstract void onDoneCreatingChildOrders();

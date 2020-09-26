@@ -1,6 +1,5 @@
 package com.h2o_execution.smart_order_router.core;
 
-import com.h2o_execution.smart_order_router.domain.Currency;
 import com.h2o_execution.smart_order_router.domain.*;
 import com.h2o_execution.smart_order_router.market_access.FIXGateway;
 import com.h2o_execution.smart_order_router.market_access.FIXMessageMediator;
@@ -13,20 +12,22 @@ import org.junit.jupiter.api.Test;
 
 import java.io.IOException;
 import java.time.ZoneId;
-import java.util.*;
+import java.util.Arrays;
+import java.util.EnumSet;
+import java.util.HashMap;
+import java.util.Map;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ThreadLocalRandom;
 
 import static org.hamcrest.MatcherAssert.assertThat;
 import static org.hamcrest.Matchers.equalTo;
 import static org.hamcrest.Matchers.is;
-import static org.mockito.ArgumentMatchers.*;
+import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
 @Slf4j
-class ConsolidatedOrderBookTest
-{
+class ConsolidatedOrderBookTest {
     static Rank vr1 = new Rank(0.1, 0.5, 0.1, 0.5, 0.5);
     static Rank vr2 = new Rank(0.2, 0.5, 0.3, 0.4, 0.2);
     static Rank vr3 = new Rank(0.3, 0.5, 0.5, 0.3, 0.2);
@@ -37,6 +38,9 @@ class ConsolidatedOrderBookTest
     static Venue nyse, chix, matchNow;
     static ConsolidatedOrderBook consolidatedOrderBook;
     static ProbabilisticExecutionVenueProvider probabilisticExecutionVenueProvider;
+
+    ConsolidatedOrderBookTest() throws IOException {
+    }
 
     @BeforeAll
     static void init() {
@@ -118,8 +122,8 @@ class ConsolidatedOrderBookTest
 
     private void initSampleBook() throws ExecutionException {
         FXRatesService fxRatesService = mock(FXRatesService.class);
-        when(fxRatesService.getFXRate(Currency.USD, Currency.CAD)).thenReturn(1d/1.3);
-        when(fxRatesService.getFXRate(Currency.CAD, Currency.USD)).thenReturn(1.3);
+        when(fxRatesService.getFXRate(Currency.USD, Currency.CAD)).thenReturn(1.3);
+        when(fxRatesService.getFXRate(Currency.CAD, Currency.USD)).thenReturn(1d / 1.3);
 
         consolidatedOrderBook = new ConsolidatedOrderBookImpl(fxRatesService);
 
@@ -134,8 +138,6 @@ class ConsolidatedOrderBookTest
         createRBISellorder(40, chix, 50);
 
     }
-
-
 
     private void createRBISellorder(double price, Venue venue, int quantity) {
         Order order = Order
@@ -157,12 +159,8 @@ class ConsolidatedOrderBookTest
         return ThreadLocalRandom.current().nextInt(0, 1000);
     }
 
-    ConsolidatedOrderBookTest() throws IOException {
-    }
-
     @Test
-    void testBook()
-    {
+    void testBook() {
         OrderManager orderManager = getOrderManager();
         Map<Currency, Double> currencyDoubleMap = sampleCurrencyPortfolio();
         RoutingConfig routingConfig = sampleRoutingConfig(currencyDoubleMap);
