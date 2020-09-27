@@ -56,7 +56,6 @@ public class FIXMessageMediator {
         try {
             String clorid = reject.getString(ClOrdID.FIELD);
             orderEventsListenerMap.get(clorid).onReject(clorid);
-
         } catch (FieldNotFound fieldNotFound) {
             log.error("Exception thrown during rejection event", fieldNotFound);
         }
