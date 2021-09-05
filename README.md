@@ -2,7 +2,8 @@
 
 #### Description
 
-This is an implementation of a cross-border, multi-venue (lit & dark) smart order router that makes latency adjustments such that child orders arrive at different venues at the same time. The primary goal is to avoid HFT arbitrage.
+An implementation of a cross-border, multi-venue (lit & dark) SOR that makes latency adjustments such that child orders arrive at different venues at the same time. 
+
 
 #### Project Components
 
